@@ -1,0 +1,55 @@
+name: AIKeyboard
+options:
+  bundleIdPrefix: com.jaxon
+  deploymentTarget:
+    iOS: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+targets:
+  AIKeyboard:
+    type: application
+    platform: iOS
+    sources:
+      - path: AIKeyboard
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaxon.aikeyboard
+        INFOPLIST_FILE: AIKeyboard/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AIKeyboard/Resources/AIKeyboard.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+    dependencies:
+      - target: KeyboardExtension
+
+  KeyboardExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: KeyboardExtension
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaxon.aikeyboard.keyboard
+        INFOPLIST_FILE: KeyboardExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: KeyboardExtension/KeyboardExtension.entitlements
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: 1
+        SKIP_INSTALL: YES
+
+  AIKeyboardTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: AIKeyboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jaxon.aikeyboard.tests
