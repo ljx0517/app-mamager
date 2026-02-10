@@ -1,6 +1,9 @@
 */**/ */.env
 .idea
 server/node_modules
+admin/node_modules
+admin/dist
+admin/.vite
 app/Pods
 app/build
 app/DerivedData
@@ -20,3 +23,6 @@ app/AIKeyboard.app.dSYM.zip.part.7
 app/AIKeyboard.app.dSYM.zip.part.8
 app/AIKeyboard.app.dSYM.zip.part.9
 app/AIKeyboard.app.dSYM.zip.part.10
+admin/node_modules
+admin/dist
+admin/.vite 
