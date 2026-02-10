@@ -20,3 +20,14 @@ app/AIKeyboard.app.dSYM.zip.part.7
 app/AIKeyboard.app.dSYM.zip.part.8
 app/AIKeyboard.app.dSYM.zip.part.9
 app/AIKeyboard.app.dSYM.zip.part.10
+node_modules
+dist
+logs
+logs/*.log
+logs/*.log.*
+logs/*.log.*.*
+logs/*.log.*.*.*
+logs/*.log.*.*.*.*
+logs/*.log.*.*.*.*.*
+logs/*.log.*.*.*.*.*.*
+logs/*.log.*.*.*.*.*.*.*
