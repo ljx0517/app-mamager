@@ -1,1 +1,22 @@
 */**/ */.env
+.idea
+server/node_modules
+app/Pods
+app/build
+app/DerivedData
+app/AIKeyboard.xcodeproj
+app/AIKeyboard.xcworkspace
+app/AIKeyboard.app
+app/AIKeyboard.app.dSYM
+app/AIKeyboard.app.dSYM.zip
+app/AIKeyboard.app.dSYM.zip.part
+app/AIKeyboard.app.dSYM.zip.part.1
+app/AIKeyboard.app.dSYM.zip.part.2
+app/AIKeyboard.app.dSYM.zip.part.3
+app/AIKeyboard.app.dSYM.zip.part.4
+app/AIKeyboard.app.dSYM.zip.part.5
+app/AIKeyboard.app.dSYM.zip.part.6
+app/AIKeyboard.app.dSYM.zip.part.7
+app/AIKeyboard.app.dSYM.zip.part.8
+app/AIKeyboard.app.dSYM.zip.part.9
+app/AIKeyboard.app.dSYM.zip.part.10
