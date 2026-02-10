@@ -33,3 +33,5 @@ Pods/
 *.lock
 profile
 timeline.xctimechart
+*/.DS_Store
+*/**/.DS_Store
