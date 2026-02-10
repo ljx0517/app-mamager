@@ -1,0 +1,40 @@
+import { router } from "./index.js";
+import { adminRouter } from "../routers/admin.js";
+import { appRouter as appManageRouter } from "../routers/app.js";
+import { subscriptionManageRouter } from "../routers/subscription-manage.js";
+import { userRouter } from "../routers/user.js";
+import { aiRouter } from "../routers/ai.js";
+import { styleRouter } from "../routers/style.js";
+import { subscriptionRouter } from "../routers/subscription.js";
+
+/**
+ * 根路由 - 多 App 管理后台
+ *
+ * 路由结构：
+ *  ┌─ 管理后台（需要 Admin 认证）──────────┐
+ *  │ admin.*              管理员认证与管理   │
+ *  │ app.*                应用 CRUD 管理     │
+ *  │ subscriptionManage.* 订阅计划与用户订阅管理 │
+ *  └──────────────────────────────────────┘
+ *  ┌─ 客户端 API（需要 x-api-key）────────┐
+ *  │ user.*               用户注册与认证    │
+ *  │ ai.*                 AI 回复生成       │
+ *  │ style.*              说话风格管理      │
+ *  │ subscription.*       订阅查询与验证     │
+ *  └──────────────────────────────────────┘
+ */
+export const appRouter = router({
+  // 管理后台
+  admin: adminRouter,
+  app: appManageRouter,
+  subscriptionManage: subscriptionManageRouter,
+
+  // 客户端 API（App 隔离）
+  user: userRouter,
+  ai: aiRouter,
+  style: styleRouter,
+  subscription: subscriptionRouter,
+});
+
+/** 导出路由类型供客户端使用 */
+export type AppRouter = typeof appRouter;
