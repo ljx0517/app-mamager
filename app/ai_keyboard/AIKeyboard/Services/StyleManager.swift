@@ -1,0 +1,160 @@
+import Foundation
+import Combine
+
+/// 风格管理服务 - 管理说话风格与风格组合
+class StyleManager: ObservableObject {
+    /// 所有可用风格（内置 + 自定义）
+    @Published var styles: [SpeakingStyle] = []
+    
+    /// 所有风格组合
+    @Published var combinations: [StyleCombination] = []
+    
+    /// 当前选中的风格 ID 列表
+    @Published var selectedStyleIDs: Set<UUID> = []
+    
+    /// 当前选中的组合
+    @Published var selectedCombination: StyleCombination?
+    
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+    
+    // MARK: - 存储 Key
+    
+    private let stylesKey = "saved_styles"
+    private let combinationsKey = "saved_combinations"
+    
+    init() {
+        loadStyles()
+        loadCombinations()
+        loadSelectedStyles()
+    }
+    
+    // MARK: - 风格管理
+    
+    /// 加载风格列表
+    func loadStyles() {
+        var allStyles = SpeakingStyle.builtInStyles
+        
+        // 加载用户自定义风格
+        if let data = UserDefaults.shared.data(forKey: stylesKey),
+           let customStyles = try? decoder.decode([SpeakingStyle].self, from: data) {
+            allStyles.append(contentsOf: customStyles)
+        }
+        
+        styles = allStyles
+    }
+    
+    /// 添加自定义风格
+    func addStyle(_ style: SpeakingStyle) {
+        styles.append(style)
+        saveCustomStyles()
+        NotificationCenter.default.post(name: AppConstants.Notification.styleUpdated, object: nil)
+    }
+    
+    /// 更新风格
+    func updateStyle(_ style: SpeakingStyle) {
+        if let index = styles.firstIndex(where: { $0.id == style.id }) {
+            styles[index] = style
+            saveCustomStyles()
+            NotificationCenter.default.post(name: AppConstants.Notification.styleUpdated, object: nil)
+        }
+    }
+    
+    /// 删除自定义风格（内置风格不可删除）
+    func deleteStyle(_ style: SpeakingStyle) {
+        guard !style.isBuiltIn else { return }
+        styles.removeAll(where: { $0.id == style.id })
+        selectedStyleIDs.remove(style.id)
+        saveCustomStyles()
+        saveSelectedStyles()
+    }
+    
+    /// 获取自定义风格数量
+    var customStyleCount: Int {
+        styles.filter { !$0.isBuiltIn }.count
+    }
+    
+    // MARK: - 选中风格管理
+    
+    /// 切换风格选中状态
+    func toggleStyleSelection(_ styleID: UUID) {
+        if selectedStyleIDs.contains(styleID) {
+            selectedStyleIDs.remove(styleID)
+        } else {
+            selectedStyleIDs.insert(styleID)
+        }
+        saveSelectedStyles()
+    }
+    
+    /// 获取当前选中风格的合并 prompt
+    func currentPrompt() -> String {
+        // 优先使用组合
+        if let combination = selectedCombination {
+            return combination.combinedPrompt(styles: styles)
+        }
+        
+        // 否则合并选中的风格
+        let selectedStyles = styles.filter { selectedStyleIDs.contains($0.id) }
+        
+        if selectedStyles.isEmpty {
+            return "请用自然、友好的语气回复。"
+        }
+        
+        if selectedStyles.count == 1, let style = selectedStyles.first {
+            return style.prompt
+        }
+        
+        let prompts = selectedStyles.map { "- \($0.name): \($0.prompt)" }.joined(separator: "\n")
+        return "请融合以下风格来回复：\n\(prompts)\n\n请自然地融合以上风格特点。"
+    }
+    
+    // MARK: - 组合管理
+    
+    /// 添加风格组合
+    func addCombination(_ combination: StyleCombination) {
+        combinations.append(combination)
+        saveCombinations()
+    }
+    
+    /// 删除风格组合
+    func deleteCombination(_ combination: StyleCombination) {
+        combinations.removeAll(where: { $0.id == combination.id })
+        if selectedCombination?.id == combination.id {
+            selectedCombination = nil
+        }
+        saveCombinations()
+    }
+    
+    // MARK: - 持久化
+    
+    private func saveCustomStyles() {
+        let customStyles = styles.filter { !$0.isBuiltIn }
+        if let data = try? encoder.encode(customStyles) {
+            UserDefaults.shared.set(data, forKey: stylesKey)
+        }
+    }
+    
+    private func saveCombinations() {
+        if let data = try? encoder.encode(combinations) {
+            UserDefaults.shared.set(data, forKey: combinationsKey)
+        }
+    }
+    
+    private func loadCombinations() {
+        if let data = UserDefaults.shared.data(forKey: combinationsKey),
+           let saved = try? decoder.decode([StyleCombination].self, from: data) {
+            combinations = saved
+        }
+    }
+    
+    private func saveSelectedStyles() {
+        let ids = selectedStyleIDs.map { $0.uuidString }
+        UserDefaults.shared.set(ids, forKey: AppConstants.UserDefaultsKey.selectedStyleIDs)
+    }
+    
+    private func loadSelectedStyles() {
+        if let ids = UserDefaults.shared.stringArray(forKey: AppConstants.UserDefaultsKey.selectedStyleIDs) {
+            selectedStyleIDs = Set(ids.compactMap { UUID(uuidString: $0) })
+        }
+    }
+}
