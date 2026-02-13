@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Card,
   Table,
@@ -33,16 +33,127 @@ import {
   APP_PLATFORM_LABELS,
   APP_PLATFORM_COLORS,
 } from '@/utils/constants'
+import { trpc } from '@/utils/trpc'
+import { useSmartLoading } from '@/hooks/useLoading'
 
 const { TextArea } = Input
 
+// 后端App数据接口定义
+interface BackendApp {
+  id: string
+  name: string
+  bundleId: string
+  platform: 'ios' | 'android' | 'web'
+  description?: string | null
+  isActive: boolean
+  apiKey: string
+  apiSecret: string
+  settings?: Record<string, any>
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+/**
+ * 将后端App数据转换为前端AppInfo格式
+ * 注：前端需要但后端没有的字段使用默认值或转换逻辑
+ */
+function backendAppToFrontend(backendApp: BackendApp): AppInfo {
+  // 将isActive转换为status
+  const status = backendApp.isActive ? 'active' : 'inactive'
+
+  // 生成slug：将name转换为小写，用连字符替换空格和非字母数字字符
+  const slug = backendApp.name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+
+  // 使用平台首字母作为图标，或从设置中读取
+  const icon = getIconFromPlatform(backendApp.platform)
+
+  return {
+    id: backendApp.id,
+    name: backendApp.name,
+    slug,
+    description: backendApp.description || '',
+    icon,
+    platform: backendApp.platform,
+    bundleId: backendApp.bundleId,
+    status,
+    createdAt: typeof backendApp.createdAt === 'string'
+      ? backendApp.createdAt
+      : backendApp.createdAt.toISOString(),
+    updatedAt: typeof backendApp.updatedAt === 'string'
+      ? backendApp.updatedAt
+      : backendApp.updatedAt.toISOString(),
+  }
+}
+
+/**
+ * 根据平台返回对应的emoji图标
+ */
+function getIconFromPlatform(platform: 'ios' | 'android' | 'web'): string {
+  switch (platform) {
+    case 'ios': return '📱'
+    case 'android': return '🤖'
+    case 'web': return '🌐'
+    default: return '📦'
+  }
+}
+
+/**
+ * 将前端AppInfo转换为后端创建/更新所需的格式
+ */
+function frontendAppToBackendCreate(appInfo: Partial<AppInfo>) {
+  return {
+    name: appInfo.name || '',
+    bundleId: appInfo.bundleId || '',
+    platform: (appInfo.platform as 'ios' | 'android' | 'web') || 'ios',
+    description: appInfo.description,
+    // 创建时由后端自动生成apiKey/apiSecret
+  }
+}
+
+function frontendAppToBackendUpdate(appInfo: Partial<AppInfo>) {
+  const updateData: any = {}
+
+  if (appInfo.name !== undefined) updateData.name = appInfo.name
+  if (appInfo.description !== undefined) updateData.description = appInfo.description
+  if (appInfo.status !== undefined) updateData.isActive = appInfo.status === 'active'
+
+  return updateData
+}
+
 export default function AppsPage() {
-  const { apps, addApp, updateApp, removeApp, setCurrentApp } = useAppStore()
+  const { apps, setApps, addApp, updateApp, removeApp, setCurrentApp } = useAppStore()
   const [editingApp, setEditingApp] = useState<AppInfo | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [form] = Form.useForm()
   const { token } = theme.useToken()
+
+  // tRPC 查询和变更
+  const appsQuery = trpc.app.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  })
+  const createAppMutation = trpc.app.create.useMutation()
+  const updateAppMutation = trpc.app.update.useMutation()
+  const deleteAppMutation = trpc.app.delete.useMutation()
+
+  // 组合加载状态
+  const overallLoading = useSmartLoading({
+    queries: [appsQuery],
+    mutations: [createAppMutation, updateAppMutation, deleteAppMutation],
+    manualStates: [loading],
+  })
+
+  // 当API数据加载完成时，更新store
+  useEffect(() => {
+    if (appsQuery.data) {
+      // 将后端App数据转换为前端AppInfo格式
+      const convertedApps = appsQuery.data.map(backendAppToFrontend)
+      setApps(convertedApps)
+    }
+  }, [appsQuery.data, setApps])
 
   // 统计
   const stats = {
@@ -69,29 +180,63 @@ export default function AppsPage() {
   }
 
   const handleDelete = (id: string) => {
-    removeApp(id)
-    message.success('应用已删除')
+    deleteAppMutation.mutate({ id }, {
+      onSuccess: (data) => {
+        message.success(data.message || '应用已删除')
+        appsQuery.refetch() // 刷新列表
+      },
+      onError: (error) => {
+        message.error(error.message || '删除应用失败')
+      },
+    })
   }
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      const now = new Date().toISOString()
+
+      // 将前端平台枚举转换为后端平台枚举
+      const platform = values.platform === 'cross_platform' ? 'ios' : values.platform
 
       if (editingApp) {
-        updateApp(editingApp.id, values)
-        message.success('应用已更新')
-      } else {
-        const newApp: AppInfo = {
-          id: `app_${Date.now()}`,
-          ...values,
-          createdAt: now,
-          updatedAt: now,
+        // 更新现有应用
+        const updateData = {
+          id: editingApp.id,
+          name: values.name,
+          description: values.description,
+          isActive: values.status === 'active',
         }
-        addApp(newApp)
-        message.success('应用已创建')
+
+        updateAppMutation.mutate(updateData, {
+          onSuccess: (data) => {
+            message.success(data.message || '应用已更新')
+            appsQuery.refetch() // 刷新列表
+            setModalOpen(false)
+          },
+          onError: (error) => {
+            message.error(error.message || '更新应用失败')
+          },
+        })
+      } else {
+        // 创建新应用
+        const createData = {
+          name: values.name,
+          bundleId: values.bundleId || `${values.slug}.app`,
+          platform,
+          description: values.description,
+        }
+
+        createAppMutation.mutate(createData, {
+          onSuccess: (data) => {
+            message.success(data.message || '应用已创建')
+            appsQuery.refetch() // 刷新列表
+            setModalOpen(false)
+          },
+          onError: (error) => {
+            message.error(error.message || '创建应用失败')
+          },
+        })
       }
-      setModalOpen(false)
     } catch {
       // 表单校验失败
     }
@@ -99,10 +244,13 @@ export default function AppsPage() {
 
   const handleRefresh = () => {
     setLoading(true)
-    setTimeout(() => {
+    appsQuery.refetch().then(() => {
       setLoading(false)
       message.success('数据已刷新')
-    }, 500)
+    }).catch((error) => {
+      setLoading(false)
+      console.error('刷新数据失败:', error)
+    })
   }
 
   const handleSwitchTo = (appId: string) => {
@@ -289,7 +437,7 @@ export default function AppsPage() {
           dataSource={apps}
           columns={columns}
           rowKey="id"
-          loading={loading}
+          loading={overallLoading}
           pagination={{
             showTotal: (total) => `共 ${total} 个应用`,
           }}
@@ -306,6 +454,10 @@ export default function AppsPage() {
         okText={editingApp ? '保存' : '创建'}
         cancelText="取消"
         width={600}
+        confirmLoading={createAppMutation.isPending || updateAppMutation.isPending}
+        okButtonProps={{
+          disabled: createAppMutation.isPending || updateAppMutation.isPending,
+        }}
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Row gutter={16}>

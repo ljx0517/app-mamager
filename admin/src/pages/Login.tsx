@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Form, Input, Button, message, theme } from 'antd'
 import { UserOutlined, LockOutlined, CloudServerOutlined } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
+import { trpc } from '@/utils/trpc'
 import { PLATFORM_NAME } from '@/utils/constants'
 
 interface LoginFormValues {
@@ -11,37 +12,36 @@ interface LoginFormValues {
 }
 
 export default function LoginPage() {
-  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuthStore()
   const { token } = theme.useToken()
 
-  const handleLogin = async (values: LoginFormValues) => {
-    setLoading(true)
-    try {
-      // TODO: 接入 tRPC 登录接口
-      // 目前使用模拟登录，方便开发调试
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      if (values.username === 'admin' && values.password === 'admin123') {
-        login(
-          {
-            id: '1',
-            username: values.username,
-            role: 'super_admin',
-          },
-          'mock-jwt-token-for-development',
-        )
-        message.success('登录成功，欢迎回来！')
-        navigate('/')
-      } else {
-        message.error('用户名或密码错误')
+  // tRPC 登录 mutation
+  const loginMutation = trpc.admin.login.useMutation({
+    onSuccess: (data) => {
+      const { token, admin } = data
+      login(
+        {
+          id: admin.id,
+          username: admin.username,
+          role: admin.role as 'admin' | 'super_admin',
+        },
+        token,
+      )
+      message.success('登录成功，欢迎回来！')
+      navigate('/')
+    },
+    onError: (error) => {
+      // 错误已由全局错误处理中间件显示，这里可以处理特殊逻辑
+      // 例如：认证失败时清空本地存储
+      if (error.data?.code === 'UNAUTHORIZED') {
+        localStorage.removeItem('admin_token')
       }
-    } catch {
-      message.error('登录失败，请稍后重试')
-    } finally {
-      setLoading(false)
-    }
+    },
+  })
+
+  const handleLogin = async (values: LoginFormValues) => {
+    loginMutation.mutate(values)
   }
 
   return (
@@ -119,7 +119,7 @@ export default function LoginPage() {
             <Button
               type="primary"
               htmlType="submit"
-              loading={loading}
+              loading={loginMutation.isPending}
               block
               style={{ height: 44, borderRadius: 8 }}
             >

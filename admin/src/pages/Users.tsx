@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Card,
   Table,
@@ -11,6 +11,7 @@ import {
   Descriptions,
   Empty,
   message,
+  Spin,
 } from 'antd'
 import {
   SearchOutlined,
@@ -29,44 +30,59 @@ import {
   SUBSCRIPTION_STATUS_COLORS,
   PAGE_SIZE_OPTIONS,
 } from '@/utils/constants'
+import { trpc } from '@/utils/trpc'
+import { useSmartLoading } from '@/hooks/useLoading'
 
-// ===== 模拟 per-App 用户数据 =====
+// ===== API 数据转换 =====
 
-const generateMockUsers = (appId: string, count: number): User[] => {
-  const tiers: User['subscriptionTier'][] = ['free', 'pro_monthly', 'pro_yearly']
-  const statuses: User['subscriptionStatus'][] = ['active', 'expired', 'cancelled', 'trial']
-  const platforms: User['platform'][] = ['ios', 'android']
-  const versions: Record<string, string[]> = {
-    app_001: ['1.0.0', '0.9.0', '0.8.0'],
-    app_002: ['2.1.0', '2.0.5', '2.0.0'],
-    app_003: ['0.5.0', '0.4.2', '0.4.0'],
+/**
+ * 将后端状态映射到前端状态
+ */
+function mapBackendToFrontendStatus(backendStatus?: string): User['subscriptionStatus'] {
+  if (!backendStatus) return 'active'
+
+  const mapping: Record<string, User['subscriptionStatus']> = {
+    active: 'active',
+    expired: 'expired',
+    cancelled: 'cancelled',
+    grace_period: 'active', // 宽限期视为活跃
   }
-  const devicePrefixes: Record<string, string[]> = {
-    app_001: ['iPhone15', 'iPhone14', 'iPhone16', 'iPhone13'],
-    app_002: ['Pixel8', 'iPhone15', 'Samsung', 'OnePlus'],
-    app_003: ['iPhone16', 'iPhone14', 'iPad'],
-  }
 
-  const appVersions = versions[appId] ?? ['1.0.0']
-  const prefixes = devicePrefixes[appId] ?? ['Device']
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: String(i + 1),
-    appId,
-    deviceId: `${prefixes[Math.floor(Math.random() * prefixes.length)]}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-    platform: platforms[Math.floor(Math.random() * platforms.length)],
-    appVersion: appVersions[Math.floor(Math.random() * appVersions.length)],
-    subscriptionTier: tiers[Math.floor(Math.random() * tiers.length)],
-    subscriptionStatus: statuses[Math.floor(Math.random() * statuses.length)],
-    createdAt: new Date(2026, Math.floor(Math.random() * 2), Math.floor(Math.random() * 28) + 1).toISOString(),
-    lastActiveAt: new Date(2026, 1, Math.floor(Math.random() * 10) + 1).toISOString(),
-  }))
+  return mapping[backendStatus] || 'active'
 }
 
-const mockUsersByApp: Record<string, User[]> = {
-  app_001: generateMockUsers('app_001', 50),
-  app_002: generateMockUsers('app_002', 35),
-  app_003: generateMockUsers('app_003', 20),
+/**
+ * 将后端订阅列表数据转换为前端 User 类型
+ */
+function subscriptionToUser(
+  subscriptionItem: any,
+  appId: string,
+  appPlatform: 'ios' | 'android' | 'web' | 'cross_platform'
+): User {
+  const { subscription, user } = subscriptionItem
+
+  // 从App平台推断用户平台（简化逻辑）
+  const platform: 'ios' | 'android' =
+    appPlatform === 'ios' || appPlatform === 'cross_platform' ? 'ios' :
+    appPlatform === 'android' ? 'android' : 'ios'
+
+  // 使用订阅时间作为最后活跃时间（简化）
+  const lastActiveAt = subscription?.updatedAt || subscription?.createdAt || user?.createdAt || new Date().toISOString()
+
+  // 默认app版本
+  const appVersion = '1.0.0'
+
+  return {
+    id: user.id || subscription.userId,
+    appId,
+    deviceId: user.deviceId || 'unknown',
+    platform,
+    appVersion,
+    subscriptionTier: subscription.tier || 'free',
+    subscriptionStatus: mapBackendToFrontendStatus(subscription.status),
+    createdAt: user.createdAt || subscription.createdAt || new Date().toISOString(),
+    lastActiveAt,
+  }
 }
 
 export default function UsersPage() {
@@ -79,23 +95,87 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-
-  const allUsers = currentAppId ? (mockUsersByApp[currentAppId] ?? []) : []
-
-  // 筛选数据
-  const filteredUsers = allUsers.filter((user) => {
-    const matchSearch = !searchText || user.deviceId.toLowerCase().includes(searchText.toLowerCase())
-    const matchTier = !tierFilter || user.subscriptionTier === tierFilter
-    const matchStatus = !statusFilter || user.subscriptionStatus === statusFilter
-    return matchSearch && matchTier && matchStatus
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: PAGE_SIZE_OPTIONS[0],
   })
 
+  // 当过滤器变化时重置分页到第一页
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, current: 1 }))
+  }, [tierFilter, statusFilter])
+
+  // 状态映射：前端 trial -> 后端 active（因为后端没有 trial 状态）
+  const getBackendStatus = (frontendStatus?: string) => {
+    if (!frontendStatus) return undefined
+    // 映射前端状态到后端状态
+    const mapping: Record<string, string> = {
+      active: 'active',
+      expired: 'expired',
+      cancelled: 'cancelled',
+      trial: 'active', // 试用中视为活跃
+    }
+    return mapping[frontendStatus] as any
+  }
+
+  // tRPC 查询
+  const subscriptionsQuery = trpc.subscriptionManage.listSubscriptions.useQuery(
+    {
+      appId: currentAppId || '',
+      status: getBackendStatus(statusFilter),
+      tier: tierFilter as any,
+      limit: pagination.pageSize,
+      offset: (pagination.current - 1) * pagination.pageSize,
+    },
+    {
+      enabled: !!currentAppId,
+      refetchOnWindowFocus: false,
+    }
+  )
+
+  // 组合加载状态
+  const overallLoading = useSmartLoading({
+    queries: [subscriptionsQuery],
+    manualStates: [loading],
+  })
+
+  // 转换API数据为用户列表
+  const apiUsers = useMemo(() => {
+    if (!subscriptionsQuery.data || !currentAppId || !currentApp) {
+      return []
+    }
+
+    return subscriptionsQuery.data.items.map((item: any) =>
+      subscriptionToUser(item, currentAppId, currentApp.platform)
+    )
+  }, [subscriptionsQuery.data, currentAppId, currentApp])
+
+  // 客户端搜索筛选（设备ID）
+  const filteredUsers = useMemo(() => {
+    if (!searchText) {
+      return apiUsers
+    }
+
+    const searchLower = searchText.toLowerCase()
+    return apiUsers.filter((user) =>
+      user.deviceId.toLowerCase().includes(searchLower)
+    )
+  }, [apiUsers, searchText])
+
   const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
+    subscriptionsQuery.refetch().then(() => {
       message.success('数据已刷新')
-    }, 500)
+    }).catch((error) => {
+      console.error('刷新数据失败:', error)
+      message.error('刷新数据失败')
+    })
+  }
+
+  const handleTableChange = (newPagination: any) => {
+    setPagination({
+      current: newPagination.current,
+      pageSize: newPagination.pageSize,
+    })
   }
 
   const handleViewDetail = (user: User) => {
@@ -239,14 +319,17 @@ export default function UsersPage() {
           dataSource={filteredUsers}
           columns={columns}
           rowKey="id"
-          loading={loading}
+          loading={overallLoading}
           pagination={{
-            total: filteredUsers.length,
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: subscriptionsQuery.data?.total || 0,
             showSizeChanger: true,
             showQuickJumper: true,
             pageSizeOptions: PAGE_SIZE_OPTIONS.map(String),
             showTotal: (total) => `共 ${total} 条记录`,
           }}
+          onChange={handleTableChange}
           scroll={{ x: 1000 }}
           size="middle"
         />
