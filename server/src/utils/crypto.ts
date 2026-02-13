@@ -39,3 +39,38 @@ export function generateApiKey(): string {
 export function generateApiSecret(): string {
   return randomBytes(64).toString("hex");
 }
+
+/**
+ * 生成邮箱验证令牌（32 字节 hex）
+ */
+export function generateVerificationToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * 生成密码重置令牌（32 字节 hex）
+ */
+export function generateResetToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+/**
+ * 计算令牌过期时间
+ * @param hoursFromNow 几小时后过期，默认 24 小时
+ * @returns Date 对象
+ */
+export function getTokenExpiryDate(hoursFromNow: number = 24): Date {
+  const expiry = new Date();
+  expiry.setHours(expiry.getHours() + hoursFromNow);
+  return expiry;
+}
+
+/**
+ * 检查令牌是否已过期
+ * @param expiresAt 过期时间
+ * @returns 是否已过期
+ */
+export function isTokenExpired(expiresAt: Date | null | undefined): boolean {
+  if (!expiresAt) return true;
+  return new Date() > expiresAt;
+}

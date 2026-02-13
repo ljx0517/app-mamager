@@ -1,10 +1,24 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { router, adminProcedure } from "../trpc/index.js";
-import { apps, users, subscriptions, styles, usageRecords, type AppSettings } from "../db/schema.js";
+import { apps, users, subscriptions, styles, usageRecords, type AppSettings, type AIProviderType, type AIProviderConfig } from "../db/schema.js";
 import { generateApiKey, generateApiSecret } from "../utils/crypto.js";
 import { TRPCError } from "@trpc/server";
 import { sql } from "drizzle-orm";
+
+/**
+ * AI 提供商配置的 Zod 模式
+ */
+const aiProviderConfigSchema = z.object({
+  type: z.enum(["openai", "anthropic", "google", "mock", "azure_openai", "unknown"]),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  model: z.string().optional(),
+  enabled: z.boolean().default(true),
+  priority: z.number().default(100),
+  retryCount: z.number().optional(),
+  timeout: z.number().optional(),
+});
 
 /**
  * 应用管理路由（仅管理员可操作）
@@ -28,6 +42,8 @@ export const appRouter = router({
             proCandidateCount: z.number().optional().default(5),
             enableAI: z.boolean().optional().default(true),
             enableSubscription: z.boolean().optional().default(true),
+            aiProviders: z.array(aiProviderConfigSchema).optional(),
+            defaultAIProvider: z.enum(["openai", "anthropic", "google", "mock", "azure_openai", "unknown"]).optional(),
           })
           .optional(),
       })
@@ -51,6 +67,14 @@ export const appRouter = router({
             proCandidateCount: 5,
             enableAI: true,
             enableSubscription: true,
+            aiProviders: [
+              {
+                type: "mock",
+                enabled: true,
+                priority: 100,
+              } as AIProviderConfig,
+            ],
+            defaultAIProvider: "mock",
           },
         })
         .returning();
@@ -115,6 +139,8 @@ export const appRouter = router({
             proCandidateCount: z.number().optional(),
             enableAI: z.boolean().optional(),
             enableSubscription: z.boolean().optional(),
+            aiProviders: z.array(aiProviderConfigSchema).optional(),
+            defaultAIProvider: z.enum(["openai", "anthropic", "google", "mock", "azure_openai", "unknown"]).optional(),
           })
           .optional(),
       })

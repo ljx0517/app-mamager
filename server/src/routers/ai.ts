@@ -2,6 +2,7 @@ import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { router, protectedProcedure } from "../trpc/index.js";
 import { users, usageRecords, subscriptions, type AppSettings } from "../db/schema.js";
+import { getGlobalAIService, initializeAppAIConfig } from "../services/ai/index.js";
 import { TRPCError } from "@trpc/server";
 
 /**
@@ -81,15 +82,30 @@ export const aiRouter = router({
         });
       }
 
-      // 3. 调用 AI 服务生成回复（预留接口）
-      // TODO: 集成 OpenAI / 其他 AI 服务
-      const replies = Array.from({ length: input.candidateCount }, (_, i) => ({
-        id: `reply_${Date.now()}_${i}`,
-        content: `[AI 回复占位] 针对「${input.text}」的回复 #${i + 1}`,
-        style: input.stylePrompt ?? "default",
-      }));
+      // 3. 获取全局 AI 服务并初始化 App 配置
+      const aiService = getGlobalAIService();
 
-      // 4. 更新用量记录
+      // 确保 App 的 AI 配置已初始化
+      const appProviders = aiService.getAppHealth(ctx.app.id);
+      if (appProviders.length === 0) {
+        // 首次调用时初始化
+        initializeAppAIConfig(aiService, ctx.app.id, appSettings);
+      }
+
+      // 4. 调用 AI 服务生成回复
+      const aiRequest = {
+        text: input.text,
+        stylePrompt: input.stylePrompt,
+        temperature: input.temperature,
+        maxTokens: input.maxTokens,
+        candidateCount: input.candidateCount,
+        appId: ctx.app.id,
+        userId: user.id,
+      };
+
+      const aiResponse = await aiService.generate(aiRequest);
+
+      // 5. 更新用量记录
       if (usage) {
         await ctx.db
           .update(usageRecords)
@@ -104,12 +120,13 @@ export const aiRouter = router({
       }
 
       return {
-        replies,
+        replies: aiResponse.replies,
         usage: {
           today: currentCount + 1,
           limit: isPro ? null : freeLimit,
           isPro,
         },
+        provider: aiResponse.provider,
       };
     }),
 

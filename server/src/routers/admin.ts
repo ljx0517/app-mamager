@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { router, publicProcedure, adminProcedure } from "../trpc/index.js";
 import { admins } from "../db/schema.js";
 import { hashPassword, verifyPassword } from "../utils/crypto.js";
+import { generateAdminToken } from "../utils/jwt.js";
 import { TRPCError } from "@trpc/server";
 
 /**
@@ -43,8 +44,14 @@ export const adminRouter = router({
         });
       }
 
-      // 简易 Token，后续可替换为 JWT
-      const token = `admin:${admin.id}`;
+      // 生成 JWT Token
+      const token = generateAdminToken({
+        id: admin.id,
+        username: admin.username,
+        email: admin.email,
+        role: admin.role,
+        tokenVersion: admin.tokenVersion,
+      });
 
       return {
         token,
@@ -93,6 +100,7 @@ export const adminRouter = router({
           username: admins.username,
           email: admins.email,
           role: admins.role,
+          tokenVersion: admins.tokenVersion,
           createdAt: admins.createdAt,
         });
 
@@ -109,6 +117,31 @@ export const adminRouter = router({
       email: ctx.admin.email,
       role: ctx.admin.role,
       createdAt: ctx.admin.createdAt,
+    };
+  }),
+
+  /**
+   * 刷新管理员 Token
+   * 验证当前 Token 并生成新的 Token
+   */
+  refresh: adminProcedure.mutation(async ({ ctx }) => {
+    const newToken = generateAdminToken({
+      id: ctx.admin.id,
+      username: ctx.admin.username,
+      email: ctx.admin.email,
+      role: ctx.admin.role,
+      tokenVersion: ctx.admin.tokenVersion,
+    });
+
+    return {
+      token: newToken,
+      admin: {
+        id: ctx.admin.id,
+        username: ctx.admin.username,
+        email: ctx.admin.email,
+        role: ctx.admin.role,
+      },
+      message: "Token 刷新成功",
     };
   }),
 
@@ -148,10 +181,17 @@ export const adminRouter = router({
           username: admins.username,
           email: admins.email,
           role: admins.role,
+          tokenVersion: admins.tokenVersion,
           createdAt: admins.createdAt,
         });
 
-      const token = `admin:${superAdmin.id}`;
+      const token = generateAdminToken({
+        id: superAdmin.id,
+        username: superAdmin.username,
+        email: superAdmin.email,
+        role: superAdmin.role,
+        tokenVersion: superAdmin.tokenVersion,
+      });
 
       return {
         admin: superAdmin,

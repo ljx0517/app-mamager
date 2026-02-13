@@ -6,12 +6,16 @@ import {
 } from "@trpc/server/adapters/fastify";
 import { createContext } from "./trpc/context.js";
 import { appRouter, type AppRouter } from "./trpc/router.js";
+import { checkEmailConfig } from "./utils/email.js";
 
 /**
  * 多 App 管理后台服务
  * 基于 Fastify + tRPC + Drizzle ORM + PostgreSQL
  */
 async function main() {
+  // 检查邮件服务配置
+  checkEmailConfig();
+
   const server = fastify({
     maxParamLength: 5000,
     logger: {
