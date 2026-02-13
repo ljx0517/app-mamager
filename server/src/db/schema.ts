@@ -60,6 +60,7 @@ export const admins = pgTable("admins", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   role: adminRoleEnum("role").default("admin").notNull(),
+  tokenVersion: integer("token_version").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -85,6 +86,14 @@ export const apps = pgTable("apps", {
     proCandidateCount: 5,
     enableAI: true,
     enableSubscription: true,
+    aiProviders: [
+      {
+        type: "mock",
+        enabled: true,
+        priority: 100,
+      } as AIProviderConfig,
+    ],
+    defaultAIProvider: "mock",
   }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -93,6 +102,29 @@ export const apps = pgTable("apps", {
     .defaultNow()
     .notNull(),
 });
+
+/** AI 提供商类型 */
+export type AIProviderType = "openai" | "anthropic" | "google" | "mock" | "azure_openai" | "unknown";
+
+/** AI 提供商配置 */
+export interface AIProviderConfig {
+  /** 提供商类型 */
+  type: AIProviderType;
+  /** API 密钥（加密存储） */
+  apiKey?: string;
+  /** 基础 URL（可选，用于自部署或代理） */
+  baseUrl?: string;
+  /** 模型名称（如 gpt-4o-mini, claude-3-haiku） */
+  model?: string;
+  /** 是否启用 */
+  enabled: boolean;
+  /** 优先级（数字越小优先级越高） */
+  priority: number;
+  /** 失败重试次数 */
+  retryCount?: number;
+  /** 超时时间（毫秒） */
+  timeout?: number;
+}
 
 /** App 配置类型（可按需扩展，不同 App 各取所需） */
 export interface AppSettings {
@@ -106,6 +138,10 @@ export interface AppSettings {
   enableAI: boolean;
   /** 是否启用订阅功能 */
   enableSubscription: boolean;
+  /** AI 提供商配置列表 */
+  aiProviders?: AIProviderConfig[];
+  /** 默认 AI 提供商类型 */
+  defaultAIProvider?: AIProviderType;
   /** 允许的扩展字段（为后续各 App 独立设置预留） */
   [key: string]: unknown;
 }
@@ -172,6 +208,13 @@ export const users = pgTable(
       .notNull(),
     deviceId: varchar("device_id", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }),
+    passwordHash: varchar("password_hash", { length: 255 }),
+    emailVerified: boolean("email_verified").default(false).notNull(),
+    verificationToken: varchar("verification_token", { length: 255 }),
+    verificationTokenExpires: timestamp("verification_token_expires", { withTimezone: true }),
+    resetToken: varchar("reset_token", { length: 255 }),
+    resetTokenExpires: timestamp("reset_token_expires", { withTimezone: true }),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -181,6 +224,7 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex("users_app_device_unique").on(table.appId, table.deviceId),
+    uniqueIndex("users_app_email_unique").on(table.appId, table.email),
   ]
 );
 

@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 变更记录 (Changelog)
+
+- **2026-02-13 18:40:03** - AI 上下文初始化
+  - 添加 Mermaid 模块结构图
+  - 更新模块索引表格
+  - 添加 AI 使用指引章节
+  - 优化项目概述和架构说明
+
 ## 项目概述
 
 这是一个多应用管理平台，采用 monorepo 结构：
@@ -9,6 +17,48 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **app/ai_keyboard/** - iOS 客户端应用（AI Keyboard），包含主应用和键盘扩展
 
 当前主要应用为 AI Keyboard：一款智能风格化回复键盘，用户预设说话风格后，键盘自动读取剪贴板内容并生成个性化回复。
+
+## 架构总览
+
+### 模块结构图
+
+```mermaid
+graph TD
+    A["(根) 多应用管理平台"] --> B["server"];
+    A --> C["app"];
+    B --> D["后端服务"];
+    C --> E["ai_keyboard"];
+
+    D --> F["src/index.ts"];
+    D --> G["src/trpc/"];
+    D --> H["src/routers/"];
+    D --> I["src/services/"];
+    D --> J["src/db/"];
+    D --> K["src/utils/"];
+
+    E --> L["AIKeyboard/"];
+    E --> M["KeyboardExtension/"];
+    E --> N["Shared/"];
+    E --> O["Tests/"];
+
+    click F "./server/src/index.ts" "查看服务入口"
+    click G "./server/src/trpc/" "查看 tRPC 配置"
+    click H "./server/src/routers/" "查看路由模块"
+    click I "./server/src/services/" "查看服务模块"
+    click J "./server/src/db/" "查看数据库模块"
+    click K "./server/src/utils/" "查看工具模块"
+    click L "./app/ai_keyboard/AIKeyboard/" "查看主应用"
+    click M "./app/ai_keyboard/KeyboardExtension/" "查看键盘扩展"
+    click N "./app/ai_keyboard/Shared/" "查看共享代码"
+    click O "./app/ai_keyboard/Tests/" "查看测试代码"
+```
+
+### 模块索引
+
+| 模块 | 路径 | 类型 | 语言 | 入口文件 | 包管理器 | 测试 |
+|------|------|------|------|----------|----------|------|
+| 后端服务 | `server/` | 后端 API | TypeScript | `src/index.ts` | pnpm | 暂无 |
+| AI Keyboard | `app/ai_keyboard/` | iOS 应用 | Swift | `AIKeyboard/App/AIKeyboardApp.swift` | Xcode | `Tests/AIKeyboardTests.swift` |
 
 ## 开发环境设置
 
@@ -109,6 +159,65 @@ style.*               - 说话风格管理
 subscription.*        - 订阅查询与验证
 ```
 
+## 运行与开发
+
+### 后端启动流程
+1. 配置环境变量（`.env` 文件）
+2. 安装依赖：`pnpm install`
+3. 启动开发服务器：`pnpm dev`
+4. 访问 `http://localhost:3000/health` 检查服务状态
+
+### 前端启动流程
+1. 打开 Xcode 项目：`open AIKeyboard.xcodeproj`
+2. 选择目标设备（模拟器或真机）
+3. 运行项目（Cmd+R）
+4. 键盘扩展需要单独启用：设置 → 通用 → 键盘 → 添加新键盘
+
+## 测试策略
+
+### 前端测试
+- 单元测试位于 `app/ai_keyboard/Tests/AIKeyboardTests.swift`
+- 测试内容：说话风格、风格组合、订阅状态、字符串和颜色扩展等
+- 运行方式：Xcode 中按 `Cmd+U` 或使用 `xcodebuild test` 命令
+
+### 后端测试
+- 目前未配置自动化测试框架
+- 可通过 `curl` 或 tRPC 客户端测试 API
+
+## 编码规范
+
+### TypeScript 规范
+- 使用 TypeScript 严格模式
+- 接口和类型定义优先使用 `interface`
+- 异步函数使用 `async/await`
+- 错误处理使用 `try/catch` 或 tRPC 错误机制
+
+### Swift 规范
+- 遵循 Swift API 设计指南
+- 使用 SwiftUI 声明式语法
+- 状态管理使用 `@StateObject` 和 `@EnvironmentObject`
+- 网络请求使用 `async/await`
+
+## AI 使用指引
+
+### 后端开发
+- **数据库操作**: 使用 Drizzle ORM，schema 定义在 `src/db/schema.ts`
+- **API 开发**: 使用 tRPC 路由，遵循认证层级（public/app/protected/admin）
+- **错误处理**: 使用 `TRPCError` 抛出标准错误
+- **多租户**: 所有业务数据按 `appId` 隔离
+
+### 前端开发
+- **网络请求**: 使用 `APIConfig.swift` 中的配置
+- **数据共享**: 主应用与键盘扩展通过 App Group 共享数据
+- **状态管理**: 使用 `@StateObject` 管理服务类实例
+- **键盘扩展**: 注意权限配置和内存限制
+
+### 常见任务
+1. **添加新 API**: 在 `src/routers/` 创建新路由，在 `src/trpc/router.ts` 注册
+2. **修改数据库**: 更新 `src/db/schema.ts`，运行 `pnpm db:generate` 和 `pnpm db:migrate`
+3. **添加新功能**: 在 `src/services/` 创建服务类，在路由中调用
+4. **iOS 新页面**: 在 `AIKeyboard/Views/` 创建 SwiftUI 视图
+
 ## 关键文件
 
 ### 后端
@@ -124,17 +233,6 @@ subscription.*        - 订阅查询与验证
 - `app/ai_keyboard/project.yml` - Xcode 项目配置（XcodeGen）
 - `app/ai_keyboard/AIKeyboard.xcodeproj` - Xcode 项目文件
 - `app/ai_keyboard/Tests/AIKeyboardTests.swift` - 单元测试示例
-
-## 测试
-
-### 前端测试
-- 单元测试位于 `app/ai_keyboard/Tests/AIKeyboardTests.swift`
-- 测试内容：说话风格、风格组合、订阅状态、字符串和颜色扩展等
-- 运行方式：Xcode 中按 `Cmd+U` 或使用 `xcodebuild test` 命令
-
-### 后端测试
-- 目前未配置自动化测试框架
-- 可通过 `curl` 或 tRPC 客户端测试 API
 
 ## 部署说明
 

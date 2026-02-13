@@ -1,7 +1,8 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { Context } from "./context.js";
-import { admins } from "../db/schema.js";
+import { admins, users } from "../db/schema.js";
+import { extractAndVerifyToken, extractAndVerifyUserToken, type AdminJWTPayload, type UserJWTPayload } from "../utils/jwt.js";
 
 /**
  * tRPC 初始化（多租户版）
@@ -52,29 +53,119 @@ export const appProcedure = t.procedure.use(async ({ ctx, next }) => {
 });
 
 /**
- * 用户级别 procedure（需要 App 认证 + 设备标识）
- * 客户端 App 的用户请求必须同时携带 x-api-key 和 x-device-id
+ * 用户级别 procedure（需要 App 认证 + 用户认证）
+ * 支持两种认证方式：
+ * 1. 传统方式：x-api-key + x-device-id（设备标识）
+ * 2. JWT方式：x-api-key + Authorization: Bearer <user_token>
+ *
+ * 如果同时提供两种方式，优先使用 JWT 认证
  */
 export const protectedProcedure = appProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.deviceId) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "缺少设备标识，请在请求头中携带 x-device-id",
-    });
+  let userAuth: {
+    userId: string;
+    deviceId: string;
+    user?: typeof users.$inferSelect;
+  } | null = null;
+
+  // 首先尝试 JWT 认证
+  if (ctx.authorization) {
+    const payload = extractAndVerifyUserToken(ctx.authorization);
+    if (payload) {
+      // 验证 Token 类型
+      if (payload.type !== "user_access_token") {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "无效的用户 Token 类型",
+        });
+      }
+
+      // 验证 Token 中的 App ID 是否与当前 App 匹配
+      if (payload.appId !== ctx.app.id) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Token 与应用不匹配",
+        });
+      }
+
+      // 从数据库中获取最新用户信息（确保用户仍存在）
+      const [user] = await ctx.db
+        .select()
+        .from(users)
+        .where(
+          and(
+            eq(users.appId, ctx.app.id),
+            eq(users.id, payload.userId),
+            eq(users.deviceId, payload.deviceId)
+          )
+        )
+        .limit(1);
+
+      if (!user) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "用户不存在或 Token 已失效",
+        });
+      }
+
+      userAuth = {
+        userId: user.id,
+        deviceId: user.deviceId,
+        user,
+      };
+    }
+  }
+
+  // 如果没有 JWT 认证，回退到设备标识认证
+  if (!userAuth) {
+    if (!ctx.deviceId) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "缺少用户认证，请提供 x-device-id 或 Authorization Token",
+      });
+    }
+
+    // 根据设备标识查找用户
+    const [user] = await ctx.db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.appId, ctx.app.id),
+          eq(users.deviceId, ctx.deviceId)
+        )
+      )
+      .limit(1);
+
+    if (!user) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "用户不存在或设备标识无效",
+      });
+    }
+
+    userAuth = {
+      userId: user.id,
+      deviceId: user.deviceId,
+      user,
+    };
   }
 
   return next({
     ctx: {
       ...ctx,
-      deviceId: ctx.deviceId,
+      deviceId: userAuth.deviceId,
+      userId: userAuth.userId,
+      user: userAuth.user,
     },
   });
 });
 
 /**
  * 管理员 procedure
- * 管理后台请求需要 Authorization: Bearer <admin_token>
- * 当前使用简易 Token 方案，后续可升级为 JWT
+ * 管理后台请求需要 Authorization: Bearer <token>
+ * 支持两种 Token 格式：
+ * 1. JWT Token（新） - 包含管理员信息和过期时间
+ * 2. 简易 Token（旧） - admin:<id> 格式，向后兼容
  */
 export const adminProcedure = t.procedure.use(async ({ ctx, next }) => {
   if (!ctx.authorization) {
@@ -84,18 +175,34 @@ export const adminProcedure = t.procedure.use(async ({ ctx, next }) => {
     });
   }
 
-  const token = ctx.authorization.replace("Bearer ", "");
+  // 提取 Token（移除 "Bearer " 前缀）
+  const rawToken = ctx.authorization.replace(/^Bearer\s+/i, "");
+  let adminId: string | null = null;
+  let payload: AdminJWTPayload | null = null;
 
-  // 简易方案：Token 格式为 admin:<id>
-  // 后续可替换为 JWT 验签
-  if (!token.startsWith("admin:")) {
+  // 首先尝试 JWT 验证
+  payload = extractAndVerifyToken(ctx.authorization);
+  if (payload) {
+    // 验证 JWT Token 类型
+    if (payload.type !== "access_token") {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "无效的 Token 类型",
+      });
+    }
+    adminId = payload.id;
+  } else if (rawToken.startsWith("admin:")) {
+    // 回退到旧版简易 Token 格式
+    adminId = rawToken.replace("admin:", "");
+  } else {
+    // 两种格式都不匹配
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "无效的管理员 Token",
     });
   }
 
-  const adminId = token.replace("admin:", "");
+  // 从数据库中获取最新管理员信息（确保管理员仍存在且状态正常）
   const [admin] = await ctx.db
     .select()
     .from(admins)
@@ -106,6 +213,14 @@ export const adminProcedure = t.procedure.use(async ({ ctx, next }) => {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "管理员不存在或 Token 已失效",
+    });
+  }
+
+  // 如果是 JWT Token，检查版本号是否匹配
+  if (payload && payload.version !== admin.tokenVersion) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Token 已失效，请重新登录",
     });
   }
 
