@@ -1,4 +1,4 @@
-import { Row, Col, Card, Table, Tag, theme, Empty } from 'antd'
+import { Row, Col, Card, Table, Tag, theme, Empty, Button } from 'antd'
 import {
   UserOutlined,
   CrownOutlined,
@@ -6,7 +6,11 @@ import {
   DollarOutlined,
   ThunderboltOutlined,
   TeamOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { useSmartLoading } from '@/hooks/useLoading'
+import Loading, { ContentLoading, TableLoading } from '@/components/Loading'
 import PageHeader from '@/components/PageHeader'
 import StatsCard from '@/components/StatsCard'
 import { useAppStore } from '@/stores/appStore'
@@ -16,6 +20,7 @@ import {
   SUBSCRIPTION_STATUS_LABELS,
   SUBSCRIPTION_STATUS_COLORS,
 } from '@/utils/constants'
+import { trpc } from '@/utils/trpc'
 
 // ===== 模拟 per-App 仪表盘数据 =====
 
@@ -99,9 +104,51 @@ export default function DashboardPage() {
   const currentApp = apps.find((a) => a.id === currentAppId)
   const { token } = theme.useToken()
 
-  const data = currentAppId ? mockDashboardData[currentAppId] : null
+  // tRPC 查询
+  const statsQuery = trpc.subscriptionManage.stats.useQuery(
+    { appId: currentAppId || '' },
+    { enabled: !!currentAppId, refetchOnWindowFocus: false }
+  )
 
-  if (!currentApp || !data) {
+  // 组合所有加载状态
+  const overallLoading = useSmartLoading({
+    queries: [statsQuery],
+  })
+
+  // 计算dashboard数据
+  const dashboardData = React.useMemo(() => {
+    if (!currentAppId) return null
+
+    // 如果有API数据，使用API数据
+    if (statsQuery.data) {
+      const apiStats = statsQuery.data
+      return {
+        stats: {
+          totalUsers: apiStats.totalUsers,
+          activeUsers: apiStats.byStatus.active || 0,
+          proUsers: (apiStats.byTier.proMonthly || 0) + (apiStats.byTier.proYearly || 0),
+          totalRevenue: 98520, // 暂时保留模拟数据，未来可从API获取
+        },
+        // 暂时保留模拟数据
+        recentUsers: mockDashboardData[currentAppId]?.recentUsers || [],
+        todayBrief: mockDashboardData[currentAppId]?.todayBrief || { newUsers: 0, apiCalls: 0, newSubs: 0, cancelSubs: 0 },
+      }
+    }
+
+    // 如果没有API数据但有模拟数据，使用模拟数据
+    if (mockDashboardData[currentAppId]) {
+      return mockDashboardData[currentAppId]
+    }
+
+    return null
+  }, [currentAppId, statsQuery.data])
+
+  // 刷新数据
+  const handleRefresh = () => {
+    statsQuery.refetch()
+  }
+
+  if (!currentApp || !dashboardData) {
     return (
       <div>
         <PageHeader title="仪表盘" subtitle="请先在左侧选择一个应用" />
@@ -117,6 +164,15 @@ export default function DashboardPage() {
       <PageHeader
         title="仪表盘"
         subtitle={`${currentApp.icon} ${currentApp.name} 运营数据概览`}
+        extra={
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleRefresh}
+            loading={overallLoading}
+          >
+            刷新数据
+          </Button>
+        }
       />
 
       {/* 统计卡片 */}
@@ -124,38 +180,42 @@ export default function DashboardPage() {
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="总用户数"
-            value={data.stats.totalUsers}
+            value={dashboardData.stats.totalUsers}
             icon={<TeamOutlined />}
             color="#1677ff"
             trend={12.5}
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="活跃用户"
-            value={data.stats.activeUsers}
+            value={dashboardData.stats.activeUsers}
             icon={<UserOutlined />}
             color="#52c41a"
             trend={8.3}
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="Pro 会员"
-            value={data.stats.proUsers}
+            value={dashboardData.stats.proUsers}
             icon={<CrownOutlined />}
             color="#faad14"
             trend={25.0}
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="总收入"
-            value={data.stats.totalRevenue}
+            value={dashboardData.stats.totalRevenue}
             prefix={<DollarOutlined />}
             icon={<RiseOutlined />}
             color="#722ed1"
             trend={18.2}
+            loading={overallLoading}
           />
         </Col>
       </Row>
@@ -173,19 +233,19 @@ export default function DashboardPage() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between" style={{ color: token.colorTextSecondary }}>
                 <span>今日新增用户</span>
-                <span className="font-medium" style={{ color: token.colorText }}>{data.todayBrief.newUsers}</span>
+                <span className="font-medium" style={{ color: token.colorText }}>{dashboardData.todayBrief.newUsers}</span>
               </div>
               <div className="flex justify-between" style={{ color: token.colorTextSecondary }}>
                 <span>今日 API 调用</span>
-                <span className="font-medium" style={{ color: token.colorText }}>{data.todayBrief.apiCalls.toLocaleString()}</span>
+                <span className="font-medium" style={{ color: token.colorText }}>{dashboardData.todayBrief.apiCalls.toLocaleString()}</span>
               </div>
               <div className="flex justify-between" style={{ color: token.colorTextSecondary }}>
                 <span>今日新增订阅</span>
-                <span className="font-medium" style={{ color: token.colorText }}>{data.todayBrief.newSubs}</span>
+                <span className="font-medium" style={{ color: token.colorText }}>{dashboardData.todayBrief.newSubs}</span>
               </div>
               <div className="flex justify-between" style={{ color: token.colorTextSecondary }}>
                 <span>今日取消订阅</span>
-                <span className="font-medium" style={{ color: token.colorText }}>{data.todayBrief.cancelSubs}</span>
+                <span className="font-medium" style={{ color: token.colorText }}>{dashboardData.todayBrief.cancelSubs}</span>
               </div>
             </div>
           </Card>
@@ -197,11 +257,12 @@ export default function DashboardPage() {
             styles={{ body: { padding: 0 } }}
           >
             <Table
-              dataSource={data.recentUsers}
+              dataSource={dashboardData.recentUsers}
               columns={recentUserColumns}
               rowKey="id"
               pagination={false}
               size="middle"
+              loading={overallLoading}
             />
           </Card>
         </Col>

@@ -1,5 +1,6 @@
 {
-  "name": "admin",
+  "name": "app-manager-admin",
+  "description": "App manager web管理端 - tRPC + Fastify + Drizzle ORM + PostgreSQL",
   "private": true,
   "version": "0.0.0",
   "type": "module",
