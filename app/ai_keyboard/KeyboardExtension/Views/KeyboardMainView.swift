@@ -34,6 +34,12 @@ struct KeyboardMainView: View {
                 clipboardHelper.acknowledgeChange()
             }
         }
+        // 监听风格变化通知
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("KeyboardStyleChanged"))) { _ in
+            AppLogger.keyboard.info("🎨 [Keyboard] 收到风格变化通知，刷新风格显示")
+            // 重新加载风格以更新显示
+            _ = loadStylePrompt() // 调用loadStylePrompt会更新selectedStyleNames
+        }
     }
     
     // MARK: - 剪贴板内容栏
@@ -223,27 +229,40 @@ struct KeyboardMainView: View {
     
     /// 从 App Group 读取当前风格 Prompt
     private func loadStylePrompt() -> String {
-        // 从共享 UserDefaults 读取选中的风格
+        // 优先读取标签组合的 prompt
+        if let tagCombinationPrompt = UserDefaults.shared.string(forKey: "current_tag_combination_prompt"),
+           !tagCombinationPrompt.isEmpty {
+            // 读取组合信息用于显示
+            if let comboInfo = UserDefaults.shared.dictionary(forKey: "current_tag_combination_info") as? [String: Any] {
+                let name = comboInfo["name"] as? String ?? "标签组合"
+                selectedStyleNames = [name]
+            } else {
+                selectedStyleNames = ["标签组合"]
+            }
+            return tagCombinationPrompt
+        }
+
+        // 回退到原来的风格选择逻辑
         guard let ids = UserDefaults.shared.stringArray(forKey: AppConstants.UserDefaultsKey.selectedStyleIDs),
               !ids.isEmpty else {
             return "请用自然、友好的语气回复。"
         }
-        
+
         // 读取保存的风格数据
         if let data = UserDefaults.shared.data(forKey: "saved_styles"),
            let styles = try? JSONDecoder().decode([SpeakingStyle].self, from: data) {
             let allStyles = SpeakingStyle.builtInStyles + styles
             let selectedStyles = allStyles.filter { ids.contains($0.id.uuidString) }
             selectedStyleNames = selectedStyles.map { $0.name }
-            
+
             if selectedStyles.count == 1, let style = selectedStyles.first {
                 return style.prompt
             }
-            
+
             let prompts = selectedStyles.map { "- \($0.name): \($0.prompt)" }.joined(separator: "\n")
             return "请融合以下风格来回复：\n\(prompts)"
         }
-        
+
         return "请用自然、友好的语气回复。"
     }
 }

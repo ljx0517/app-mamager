@@ -2,28 +2,28 @@ import Foundation
 import SwiftUI
 
 /// 说话风格模型
-struct SpeakingStyle: Identifiable, Codable, Hashable {
-    let id: UUID
-    var name: String
-    var description: String
-    var icon: String                // SF Symbol 名称
-    var colorHex: String            // 主题色 Hex 值
-    var prompt: String              // 发送给 AI 的风格描述 prompt
-    var isBuiltIn: Bool             // 是否为内置风格
-    var isEnabled: Bool             // 是否已启用
-    var emojiFrequency: EmojiFrequency  // Emoji 使用频率
-    var toneLevel: Int              // 语气强度 1-5
-    var createdAt: Date
-    var updatedAt: Date
+public struct SpeakingStyle: Identifiable, Codable, Hashable {
+    public let id: UUID
+    public var name: String
+    public var description: String
+    public var icon: String                // SF Symbol 名称
+    public var colorHex: String            // 主题色 Hex 值
+    public var prompt: String              // 发送给 AI 的风格描述 prompt
+    public var isBuiltIn: Bool             // 是否为内置风格
+    public var isEnabled: Bool             // 是否已启用
+    public var emojiFrequency: EmojiFrequency  // Emoji 使用频率
+    public var toneLevel: Int              // 语气强度 1-5
+    public var createdAt: Date
+    public var updatedAt: Date
     
     /// Emoji 使用频率
-    enum EmojiFrequency: String, Codable, CaseIterable {
+    public enum EmojiFrequency: String, Codable, CaseIterable {
         case none = "none"          // 不使用
         case low = "low"            // 偶尔使用
         case medium = "medium"      // 适度使用
         case high = "high"          // 大量使用
         
-        var displayName: String {
+        public var displayName: String {
             switch self {
             case .none: return "不使用"
             case .low: return "偶尔"
@@ -34,11 +34,11 @@ struct SpeakingStyle: Identifiable, Codable, Hashable {
     }
     
     /// 主题色
-    var color: Color {
+    public var color: Color {
         Color(hex: colorHex) ?? .blue
     }
     
-    init(
+    public init(
         id: UUID = UUID(),
         name: String,
         description: String,
@@ -71,7 +71,7 @@ struct SpeakingStyle: Identifiable, Codable, Hashable {
 
 extension SpeakingStyle {
     /// 内置风格列表
-    static let builtInStyles: [SpeakingStyle] = [
+    public static let builtInStyles: [SpeakingStyle] = [
         SpeakingStyle(
             name: "幽默",
             description: "轻松搞笑，用幽默化解一切",

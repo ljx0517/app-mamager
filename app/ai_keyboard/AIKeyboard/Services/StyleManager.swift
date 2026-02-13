@@ -27,6 +27,11 @@ class StyleManager: ObservableObject {
         loadStyles()
         loadCombinations()
         loadSelectedStyles()
+        setupNotificationListeners()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - 风格管理
@@ -84,6 +89,7 @@ class StyleManager: ObservableObject {
             selectedStyleIDs.insert(styleID)
         }
         saveSelectedStyles()
+        NotificationCenter.default.post(name: AppConstants.Notification.styleSelectionChanged, object: nil)
     }
     
     /// 获取当前选中风格的合并 prompt
@@ -156,5 +162,24 @@ class StyleManager: ObservableObject {
         if let ids = UserDefaults.shared.stringArray(forKey: AppConstants.UserDefaultsKey.selectedStyleIDs) {
             selectedStyleIDs = Set(ids.compactMap { UUID(uuidString: $0) })
         }
+    }
+
+    // MARK: - 通知监听
+
+    private func setupNotificationListeners() {
+        NotificationCenter.default.addObserver(
+            forName: AppConstants.Notification.tagCombinationSelectionChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.clearSelection()
+        }
+    }
+
+    /// 清除所有选中风格（不发送通知）
+    private func clearSelection() {
+        selectedStyleIDs.removeAll()
+        selectedCombination = nil
+        saveSelectedStyles()
     }
 }

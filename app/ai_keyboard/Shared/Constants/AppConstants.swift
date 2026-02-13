@@ -41,10 +41,12 @@ enum AppConstants {
     }
     
     // MARK: - Notification Names
-    
+
     enum Notification {
         static let subscriptionStatusChanged = Foundation.Notification.Name("subscriptionStatusChanged")
         static let styleUpdated = Foundation.Notification.Name("styleUpdated")
         static let clipboardContentChanged = Foundation.Notification.Name("clipboardContentChanged")
+        static let styleSelectionChanged = Foundation.Notification.Name("styleSelectionChanged")
+        static let tagCombinationSelectionChanged = Foundation.Notification.Name("tagCombinationSelectionChanged")
     }
 }

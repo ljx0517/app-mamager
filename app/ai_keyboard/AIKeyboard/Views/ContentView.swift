@@ -4,14 +4,20 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var styleManager: StyleManager
     @EnvironmentObject var subscriptionManager: SubscriptionManager
-    
+    @EnvironmentObject var tagManager: TagManager
+
     var body: some View {
         TabView {
             StyleListView()
                 .tabItem {
                     Label("风格", systemImage: "paintpalette.fill")
                 }
-            
+
+            TagCombinationListView()
+                .tabItem {
+                    Label("组合", systemImage: "square.stack.fill")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("设置", systemImage: "gearshape.fill")
@@ -25,4 +31,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(StyleManager())
         .environmentObject(SubscriptionManager())
+        .environmentObject(TagManager.shared)
 }
