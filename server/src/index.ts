@@ -66,6 +66,13 @@ async function main() {
     };
   });
 
+  // 注册 Webhook 路由
+  server.register(async (fastify) => {
+    // Apple Store Server Notifications V2 Webhook
+    const appleWebhook = await import("./routers/webhook.js");
+    fastify.register(appleWebhook.default, { prefix: "/webhook" });
+  });
+
   // 启动服务
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || "0.0.0.0";
