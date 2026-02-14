@@ -22,6 +22,7 @@
 		5C73BDA9D124187C6704D4E1 /* UserDefaults+AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C01E426E441E41F687A3D3 /* UserDefaults+AppGroup.swift */; };
 		5C8F2AC09AF3A5B7FD61A698 /* UserDefaults+AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43C01E426E441E41F687A3D3 /* UserDefaults+AppGroup.swift */; };
 		5E76BCBB3B0CE5C974E5E4C6 /* ReplyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13656596FC0AA8880C8C8192 /* ReplyCardView.swift */; };
+		6623C3E67314FAFBE35CBF0E /* KeyboardStylePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94F521F553EB52759B42190F /* KeyboardStylePickerView.swift */; };
 		66DB6F486B3B067175CB2CEE /* TagCombinationEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B68B467CD8A07B8EAC6EF2C /* TagCombinationEditorView.swift */; };
 		6773660236AFCA0C5D4D3109 /* AppLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19A0774E8C138B925640185D /* AppLogger.swift */; };
 		6CB5589417C53824C947E46A /* Subscription.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ADB02A2FDF8F72559D6F080 /* Subscription.swift */; };
@@ -118,6 +119,7 @@
 		8133CDF44EA2EA2E4FAF18FD /* KeyboardClipboardHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardClipboardHelper.swift; sourceTree = "<group>"; };
 		86D83D96FF22BFC335E43BF4 /* SubscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionManager.swift; sourceTree = "<group>"; };
 		88C28F02B8D990F71CDB5B7A /* TagCombination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagCombination.swift; sourceTree = "<group>"; };
+		94F521F553EB52759B42190F /* KeyboardStylePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardStylePickerView.swift; sourceTree = "<group>"; };
 		9B406339F124EBA28CA52FC5 /* Color+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Extension.swift"; sourceTree = "<group>"; };
 		A85BE0E1E51B673193DE00C1 /* AIKeyboard.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AIKeyboard.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A8DAC9D3EDAE7B0D242FDF4C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 			isa = PBXGroup;
 			children = (
 				F0FF270559A37C9C5A82D55E /* KeyboardMainView.swift */,
+				94F521F553EB52759B42190F /* KeyboardStylePickerView.swift */,
 				13656596FC0AA8880C8C8192 /* ReplyCardView.swift */,
 				56E910667A29FCCF0B95DF0F /* StyleSelectorView.swift */,
 			);
@@ -450,6 +453,7 @@
 				4939AB4F239128826E4ECBEE /* KeyboardAIService.swift in Sources */,
 				0E9C0272C5A3BEC340A272E7 /* KeyboardClipboardHelper.swift in Sources */,
 				9684853C0225D70794522C1C /* KeyboardMainView.swift in Sources */,
+				6623C3E67314FAFBE35CBF0E /* KeyboardStylePickerView.swift in Sources */,
 				15383E4F9E254735834A2D91 /* KeyboardViewController.swift in Sources */,
 				5E76BCBB3B0CE5C974E5E4C6 /* ReplyCardView.swift in Sources */,
 				E1A450C16101EFE5D9F4A222 /* SpeakingStyle.swift in Sources */,

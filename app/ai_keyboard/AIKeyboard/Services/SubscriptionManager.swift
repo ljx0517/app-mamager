@@ -30,9 +30,122 @@ class SubscriptionManager: ObservableObject {
     }
     
     // MARK: - 是否为 Pro 用户
-    
+
     var isPro: Bool {
         subscriptionStatus.isPro
+    }
+
+    // MARK: - 权限检查
+
+    /// 检查是否可以执行 AI 回复功能
+    func canUseAIFeature() -> Bool {
+        if isPro {
+            return true
+        }
+
+        // 检查每日使用限制
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // 获取上次使用日期
+        let lastDate = UserDefaults.shared.object(forKey: AppConstants.UserDefaultsKey.lastReplyDate) as? Date
+        let lastReplyDay = lastDate.map { calendar.startOfDay(for: $0) }
+
+        // 如果是新的一天，重置计数
+        if lastReplyDay != today {
+            UserDefaults.shared.set(0, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+            UserDefaults.shared.set(Date(), forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+            return true
+        }
+
+        // 检查今日已使用次数
+        let usedCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        return usedCount < AppConstants.freeReplyLimitPerDay
+    }
+
+    /// 记录一次 AI 回复使用
+    func recordAIFeatureUsage() {
+        guard !isPro else { return }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let lastDate = UserDefaults.shared.object(forKey: AppConstants.UserDefaultsKey.lastReplyDate) as? Date
+        let lastReplyDay = lastDate.map { calendar.startOfDay(for: $0) }
+
+        // 如果是新的一天，重置计数
+        if lastReplyDay != today {
+            UserDefaults.shared.set(1, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+            UserDefaults.shared.set(Date(), forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+        } else {
+            // 增加计数
+            let usedCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+            UserDefaults.shared.set(usedCount + 1, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        }
+    }
+
+    /// 获取今日已使用 AI 回复次数
+    func getTodayAIFeatureUsage() -> Int {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let lastDate = UserDefaults.shared.object(forKey: AppConstants.UserDefaultsKey.lastReplyDate) as? Date
+        let lastReplyDay = lastDate.map { calendar.startOfDay(for: $0) }
+
+        // 如果是新的一天，返回0
+        if lastReplyDay != today {
+            return 0
+        }
+
+        return UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+    }
+
+    /// 获取剩余可用 AI 回复次数
+    func getRemainingAIFeatureUsage() -> Int {
+        if isPro {
+            return Int.max // 无限制
+        }
+
+        let used = getTodayAIFeatureUsage()
+        return max(0, AppConstants.freeReplyLimitPerDay - used)
+    }
+
+    /// 检查是否可以创建自定义风格
+    func canCreateCustomStyle(currentCount: Int) -> Bool {
+        if isPro {
+            return true // Pro用户无限制
+        }
+        return currentCount < AppConstants.freeCustomStyleCount
+    }
+
+    /// 检查是否可以添加更多基础风格
+    func canAddMoreBaseStyle(currentCount: Int) -> Bool {
+        if isPro {
+            return true // Pro用户无限制
+        }
+        return currentCount < AppConstants.freeStyleCount
+    }
+
+    /// 获取候选回复数量
+    func getCandidateCount() -> Int {
+        if isPro {
+            return AppConstants.proCandidateCount
+        }
+        return AppConstants.freeCandidateCount
+    }
+
+    /// 获取可用的基础风格数量限制
+    func getBaseStyleLimit() -> Int {
+        if isPro {
+            return Int.max // 无限制
+        }
+        return AppConstants.freeStyleCount
+    }
+
+    /// 获取可用的自定义风格数量限制
+    func getCustomStyleLimit() -> Int {
+        if isPro {
+            return Int.max // 无限制
+        }
+        return AppConstants.freeCustomStyleCount
     }
     
     // MARK: - 加载订阅状态
