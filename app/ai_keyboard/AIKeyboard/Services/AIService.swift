@@ -40,26 +40,55 @@ class AIService {
     /// - Parameters:
     ///   - message: 对方的消息内容
     ///   - stylePrompt: 说话风格 prompt
-    ///   - candidateCount: 候选回复数量
+    ///   - candidateCount: 候选回复数量（如果为nil，则根据订阅状态自动选择）
     ///   - model: 指定模型（可选）
+    ///   - subscriptionManager: 订阅管理器，用于权限检查（可选）
     /// - Returns: 候选回复列表
     func generateReply(
         message: String,
         stylePrompt: String,
-        candidateCount: Int = 1,
-        model: String? = nil
+        candidateCount: Int? = nil,
+        model: String? = nil,
+        subscriptionManager: SubscriptionManager? = nil
     ) async throws -> GenerateResponse {
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
+        // 权限检查
+        if let manager = subscriptionManager {
+            // 检查是否可以执行 AI 功能
+            if !manager.canUseAIFeature() {
+                let usedCount = manager.getTodayAIFeatureUsage()
+                let limit = AppConstants.freeReplyLimitPerDay
+                throw NSError(
+                    domain: "AIService",
+                    code: 429,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "今日 AI 回复次数已达上限",
+                        NSLocalizedRecoverySuggestionErrorKey: "免费用户每日限 \(limit) 次回复，您已使用 \(usedCount) 次。升级到 Pro 版可享受无限制使用。"
+                    ]
+                )
+            }
+        }
+
+        // 确定候选回复数量
+        let finalCandidateCount: Int
+        if let specifiedCount = candidateCount {
+            finalCandidateCount = specifiedCount
+        } else if let manager = subscriptionManager {
+            finalCandidateCount = manager.getCandidateCount()
+        } else {
+            finalCandidateCount = 1 // 默认值
+        }
+
         AppLogger.ai.info("📤 [AIService] 开始生成回复")
         AppLogger.ai.info("📤 [AIService] 消息内容: \(message.truncated(to: 50))")
         AppLogger.ai.info("📤 [AIService] 风格 Prompt: \(stylePrompt.truncated(to: 80))")
-        AppLogger.ai.info("📤 [AIService] 候选数量: \(candidateCount), 模型: \(model ?? "default")")
-        
+        AppLogger.ai.info("📤 [AIService] 候选数量: \(finalCandidateCount), 模型: \(model ?? "default")")
+
         let request = GenerateRequest(
             message: message,
             stylePrompt: stylePrompt,
-            candidateCount: candidateCount,
+            candidateCount: finalCandidateCount,
             model: model
         )
         
@@ -99,6 +128,14 @@ class AIService {
             for (index, reply) in result.replies.enumerated() {
                 AppLogger.ai.debug("💬 [AIService] 回复[\(index)]: \(reply.truncated(to: 60))")
             }
+
+            // 记录使用次数
+            if let manager = subscriptionManager {
+                manager.recordAIFeatureUsage()
+                let remaining = manager.getRemainingAIFeatureUsage()
+                AppLogger.ai.info("📊 [AIService] 记录使用次数，剩余可用次数: \(remaining)")
+            }
+
             return result
         case 429:
             AppLogger.ai.warning("⚠️ [AIService] 频率限制 (429)，今日免费次数已用完")

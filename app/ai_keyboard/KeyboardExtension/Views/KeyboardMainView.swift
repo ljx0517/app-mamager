@@ -12,6 +12,8 @@ struct KeyboardMainView: View {
     @State private var isGenerating = false
     @State private var selectedStyleNames: [String] = []
     @State private var errorMessage: String?
+    @State private var showUpgradePrompt = false
+    @State private var usageInfo: (used: Int, remaining: Int, limit: Int, isPro: Bool) = (0, 10, 10, false)
     
     var body: some View {
         VStack(spacing: 0) {
@@ -190,7 +192,16 @@ struct KeyboardMainView: View {
             errorMessage = "剪贴板中没有文本内容"
             return
         }
-        
+
+        // 检查权限：每日使用限制
+        let usageCheck = canGenerateReply(subscriptionStatus: subscriptionStatus)
+        if !usageCheck.canGenerate {
+            usageInfo = getUsageInfo(subscriptionStatus: subscriptionStatus)
+            showUpgradePrompt = true
+            AppLogger.keyboard.warning("⛔ [Keyboard] 免费用户每日限制已达上限: \(usageInfo.used)/\(usageInfo.limit)")
+            return
+        }
+
         isGenerating = true
         errorMessage = nil
         replies = []
@@ -213,6 +224,9 @@ struct KeyboardMainView: View {
                     candidateCount: candidateCount
                 )
                 await MainActor.run {
+                    // 记录使用次数
+                    recordReplyUsage(subscriptionStatus: subscriptionStatus)
+
                     replies = response.replies
                     isGenerating = false
                     AppLogger.keyboard.info("🎉 [Keyboard] 回复已展示，共 \(response.replies.count) 条")
@@ -264,5 +278,84 @@ struct KeyboardMainView: View {
         }
 
         return "请用自然、友好的语气回复。"
+    }
+
+    // MARK: - 每日使用限制辅助函数
+
+    /// 检查是否可以生成回复
+    private func canGenerateReply(subscriptionStatus: SubscriptionStatus) -> (canGenerate: Bool, remainingCount: Int, limit: Int) {
+        // Pro 用户无限制
+        if subscriptionStatus.isPro {
+            return (true, Int.max, Int.max)
+        }
+
+        // 免费用户检查每日限制
+        let today = getTodayString()
+        let lastDate = UserDefaults.shared.string(forKey: AppConstants.UserDefaultsKey.lastReplyDate) ?? ""
+        var dailyCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+
+        // 如果日期不是今天，重置计数
+        if lastDate != today {
+            dailyCount = 0
+            UserDefaults.shared.set(dailyCount, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+            UserDefaults.shared.set(today, forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+        }
+
+        let remaining = AppConstants.freeReplyLimitPerDay - dailyCount
+        let canGenerate = remaining > 0
+
+        return (canGenerate, remaining, AppConstants.freeReplyLimitPerDay)
+    }
+
+    /// 获取当前使用情况
+    private func getUsageInfo(subscriptionStatus: SubscriptionStatus) -> (used: Int, remaining: Int, limit: Int, isPro: Bool) {
+        if subscriptionStatus.isPro {
+            return (0, Int.max, Int.max, true)
+        }
+
+        let today = getTodayString()
+        let lastDate = UserDefaults.shared.string(forKey: AppConstants.UserDefaultsKey.lastReplyDate) ?? ""
+        var dailyCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+
+        // 如果日期不是今天，重置计数
+        if lastDate != today {
+            dailyCount = 0
+            UserDefaults.shared.set(dailyCount, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+            UserDefaults.shared.set(today, forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+        }
+
+        let remaining = AppConstants.freeReplyLimitPerDay - dailyCount
+        return (dailyCount, remaining, AppConstants.freeReplyLimitPerDay, false)
+    }
+
+    /// 记录一次回复使用
+    private func recordReplyUsage(subscriptionStatus: SubscriptionStatus) {
+        // Pro 用户不记录使用次数
+        if subscriptionStatus.isPro {
+            return
+        }
+
+        let today = getTodayString()
+        let lastDate = UserDefaults.shared.string(forKey: AppConstants.UserDefaultsKey.lastReplyDate) ?? ""
+        var dailyCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+
+        // 如果日期不是今天，重置计数
+        if lastDate != today {
+            dailyCount = 0
+            UserDefaults.shared.set(today, forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+        }
+
+        // 增加计数
+        dailyCount += 1
+        UserDefaults.shared.set(dailyCount, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+
+        AppLogger.keyboard.info("📊 [DailyUsage] 记录回复使用，今日已使用: \(dailyCount)/\(AppConstants.freeReplyLimitPerDay)")
+    }
+
+    /// 获取今天的日期字符串（ISO 8601 年月日格式）
+    private func getTodayString() -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withYear, .withMonth, .withDay, .withDashSeparatorInDate]
+        return formatter.string(from: Date())
     }
 }
