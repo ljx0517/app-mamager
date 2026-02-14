@@ -29,7 +29,9 @@ export const queryClient = new QueryClient({
  */
 const errorHandlingLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
+    console.log('🔗 tRPC link - Operation:', op.path, 'Input:', op.input, 'Type:', op.type, 'Id:', op.id)
     return next(op).catch((error) => {
+      console.log('🔗 tRPC link - Error:', error)
       // 提取用户友好的错误信息
       const errorMessage = getErrorMessage(error)
 
