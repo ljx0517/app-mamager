@@ -1,7 +1,7 @@
 import { createTRPCReact } from '@trpc/react-query'
 import { httpBatchLink, type TRPCLink } from '@trpc/client'
 import { QueryClient } from '@tanstack/react-query'
-import type { AppRouter } from '@/types/router'
+import type { AppRouter } from 'app-manager-server'
 import { message } from 'antd'
 
 /**
@@ -30,7 +30,7 @@ export const queryClient = new QueryClient({
 const errorHandlingLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
     console.log('🔗 tRPC link - Operation:', op.path, 'Input:', op.input, 'Type:', op.type, 'Id:', op.id)
-    return next(op).catch((error) => {
+    return next(op).catch((error: any) => {
       console.log('🔗 tRPC link - Error:', error)
       // 提取用户友好的错误信息
       const errorMessage = getErrorMessage(error)

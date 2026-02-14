@@ -15,12 +15,12 @@ export default defineConfig({
     port: 3100,
     proxy: {
       '/api/trpc': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/trpc/, '/trpc'),
       },
       '/trpc': {
-        target: 'http://localhost:3000',
+        target: 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
     },

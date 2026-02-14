@@ -1,10 +1,13 @@
 {
   "name": "app-manager-server",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "App manager 服务端 - tRPC + Fastify + Drizzle ORM + PostgreSQL",
   "author": "Jaxon",
   "license": "MIT",
   "type": "module",
+  "exports": {
+    ".": "./src/trpc/router.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
