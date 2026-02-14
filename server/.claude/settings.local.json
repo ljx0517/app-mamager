@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "mcp__memory__initializeMemory",
+      "Bash(pnpm db:generate:*)",
+      "mcp__memory__getMemoryStatusBoard",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm db:migrate:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "mcp__memory__startSession",
+      "mcp__memory__storeMilestone",
+      "mcp__memory__commitSession",
+      "mcp__memory__checkHealth",
+      "mcp__memory__getRecentMessages",
+      "mcp__memory__getActiveFiles"
+    ]
+  }
+}

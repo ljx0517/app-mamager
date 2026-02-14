@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify";
 import { TRPCError } from "@trpc/server";
+import { createCallerFactory } from "@trpc/server";
 import { appRouter } from "../trpc/router.js";
 import { createContext } from "../trpc/context.js";
 
@@ -17,9 +18,6 @@ import { createContext } from "../trpc/context.js";
  * - GET  /api/ai/models → ai.models (protected)
  * - POST /api/user/register → user.register (app)
  * - POST /api/user/refresh → user.refresh (protected)
- * - POST /api/user/login → user.loginWithEmail (app)
- * - GET  /api/user/me → user.me (protected)
- * - POST /api/user/register-with-email → user.registerWithEmail (app)
  */
 
 /**
@@ -47,15 +45,17 @@ function mapTRPCErrorToHTTP(error: TRPCError): { statusCode: number; message: st
 }
 
 /**
- * 简单的 REST 到 tRPC 转发器
- * 实际上，我们可以直接使用现有的 tRPC 端点
- * 但为了保持 REST 路径，我们创建一个简单的转发层
- *
- * 注意：这是一个简化实现，实际生产环境需要更完善的错误处理和类型安全
+ * 创建 tRPC 调用器
  */
+async function createTRPCCaller(req: any, res: any) {
+  const context = await createContext({ req, res });
 
-// 由于直接调用 tRPC 内部方法比较复杂，我们采用简化方案
-// 在实际部署中，可以考虑使用反向代理或更完善的适配器
+  // 使用 createCallerFactory 创建调用器
+  const createCaller = createCallerFactory(appRouter);
+  const caller = createCaller(context);
+
+  return caller;
+}
 
 /**
  * 注册 REST 适配层路由
@@ -69,7 +69,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.post("/api/subscription/verify", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "subscription.verify", request.body);
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("subscription.verify", request.body);
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -103,7 +105,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.get("/api/subscription/status", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "subscription.status");
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.query("subscription.status");
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -137,7 +141,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.post("/api/subscription/restore", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "subscription.restore", request.body);
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("subscription.restore", request.body);
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -173,7 +179,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.post("/api/ai/generate", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "ai.generate", request.body);
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("ai.generate", request.body);
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -207,7 +215,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.get("/api/ai/models", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "ai.models");
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.query("ai.models");
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -243,7 +253,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.post("/api/user/register", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "user.register", request.body);
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("user.register", request.body);
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -277,7 +289,9 @@ export async function registerRestAdapter(server: FastifyInstance) {
    */
   server.post("/api/user/refresh", async (request, reply) => {
     try {
-      const result = await callTRPCProcedure(server, request, "user.refresh");
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("user.refresh");
+
       return reply.status(200).send({
         success: true,
         data: result,
@@ -295,108 +309,6 @@ export async function registerRestAdapter(server: FastifyInstance) {
       }
 
       console.error("User refresh error:", error);
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Internal server error",
-        },
-      });
-    }
-  });
-
-  /**
-   * POST /api/user/login
-   * 邮箱密码登录
-   */
-  server.post("/api/user/login", async (request, reply) => {
-    try {
-      const result = await callTRPCProcedure(server, request, "user.loginWithEmail", request.body);
-      return reply.status(200).send({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        const { statusCode, message } = mapTRPCErrorToHTTP(error);
-        return reply.status(statusCode).send({
-          success: false,
-          error: {
-            code: error.code,
-            message,
-          },
-        });
-      }
-
-      console.error("User login error:", error);
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Internal server error",
-        },
-      });
-    }
-  });
-
-  /**
-   * GET /api/user/me
-   * 获取当前用户信息
-   */
-  server.get("/api/user/me", async (request, reply) => {
-    try {
-      const result = await callTRPCProcedure(server, request, "user.me");
-      return reply.status(200).send({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        const { statusCode, message } = mapTRPCErrorToHTTP(error);
-        return reply.status(statusCode).send({
-          success: false,
-          error: {
-            code: error.code,
-            message,
-          },
-        });
-      }
-
-      console.error("User me error:", error);
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Internal server error",
-        },
-      });
-    }
-  });
-
-  /**
-   * POST /api/user/register-with-email
-   * 邮箱注册
-   */
-  server.post("/api/user/register-with-email", async (request, reply) => {
-    try {
-      const result = await callTRPCProcedure(server, request, "user.registerWithEmail", request.body);
-      return reply.status(200).send({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      if (error instanceof TRPCError) {
-        const { statusCode, message } = mapTRPCErrorToHTTP(error);
-        return reply.status(statusCode).send({
-          success: false,
-          error: {
-            code: error.code,
-            message,
-          },
-        });
-      }
-
-      console.error("User register with email error:", error);
       return reply.status(500).send({
         success: false,
         error: {

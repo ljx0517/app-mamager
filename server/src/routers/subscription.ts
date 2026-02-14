@@ -3,6 +3,8 @@ import { eq, and } from "drizzle-orm";
 import { router, appProcedure, protectedProcedure } from "../trpc/index.js";
 import { users, subscriptions, subscriptionPlans } from "../db/schema.js";
 import { TRPCError } from "@trpc/server";
+import { getGlobalAppleStoreService } from "../services/apple/index.js";
+import { getGlobalCache, SubscriptionCacheKeys } from "../utils/cache.js";
 
 /**
  * 订阅路由 - 客户端 API（App 隔离）
@@ -96,11 +98,30 @@ export const subscriptionRouter = router({
         });
       }
 
-      // TODO: 调用 App Store Server API / Google Play API 验证收据合法性
-      // 当前为占位逻辑，后续集成真实验证
+      // 3. 调用 Apple Store API 验证收据合法性
+      const appleService = getGlobalAppleStoreService();
+      const validationResult = await appleService.verifyReceipt(
+        input.receiptData,
+        input.productId
+      );
 
-      // 3. 激活订阅
-      const expiresAt = new Date(
+      if (!validationResult.isValid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: validationResult.error?.message || "收据验证失败",
+        });
+      }
+
+      // 检查产品ID是否匹配
+      if (validationResult.productId !== input.productId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `收据中的产品ID (${validationResult.productId}) 与请求的产品ID (${input.productId}) 不匹配`,
+        });
+      }
+
+      // 4. 激活订阅（使用 Apple 返回的过期时间）
+      const expiresAt = validationResult.expiresAt || new Date(
         Date.now() + plan.durationDays * 24 * 60 * 60 * 1000
       );
 
@@ -110,24 +131,43 @@ export const subscriptionRouter = router({
         .where(eq(subscriptions.userId, user.id))
         .limit(1);
 
+      // 确定订阅状态（根据 Apple 返回的状态）
+      let subscriptionStatus: typeof subscriptions.$inferSelect.status = "active";
+      if (validationResult.status === "expired") {
+        subscriptionStatus = "expired";
+      } else if (validationResult.status === "cancelled") {
+        subscriptionStatus = "cancelled";
+      } else if (validationResult.status === "grace_period") {
+        subscriptionStatus = "grace_period";
+      }
+
       if (existing) {
         const [updated] = await ctx.db
           .update(subscriptions)
           .set({
             planId: plan.id,
             tier: plan.tier,
-            status: "active",
-            originalTransactionId: `txn_${Date.now()}`,
+            status: subscriptionStatus,
+            originalTransactionId: validationResult.originalTransactionId,
             expiresAt,
             updatedAt: new Date(),
           })
           .where(eq(subscriptions.id, existing.id))
           .returning();
 
+        // 清除用户订阅缓存
+        const cache = getGlobalCache();
+        cache.delete(SubscriptionCacheKeys.userSubscription(user.id));
+
         return {
           subscription: updated,
           plan: { id: plan.id, name: plan.name },
           message: "订阅验证成功",
+          appleValidation: {
+            originalTransactionId: validationResult.originalTransactionId,
+            willAutoRenew: validationResult.willAutoRenew,
+            isInIntroOfferPeriod: validationResult.isInIntroOfferPeriod,
+          },
         };
       }
 
@@ -137,21 +177,30 @@ export const subscriptionRouter = router({
           userId: user.id,
           planId: plan.id,
           tier: plan.tier,
-          status: "active",
-          originalTransactionId: `txn_${Date.now()}`,
+          status: subscriptionStatus,
+          originalTransactionId: validationResult.originalTransactionId,
           expiresAt,
         })
         .returning();
+
+      // 清除用户订阅缓存
+      const cache = getGlobalCache();
+      cache.delete(SubscriptionCacheKeys.userSubscription(user.id));
 
       return {
         subscription: newSub,
         plan: { id: plan.id, name: plan.name },
         message: "订阅创建成功",
+        appleValidation: {
+          originalTransactionId: validationResult.originalTransactionId,
+          willAutoRenew: validationResult.willAutoRenew,
+          isInIntroOfferPeriod: validationResult.isInIntroOfferPeriod,
+        },
       };
     }),
 
   /**
-   * 查询当前用户订阅状态
+   * 查询当前用户订阅状态（带缓存）
    */
   status: protectedProcedure.query(async ({ ctx }) => {
     const [user] = await ctx.db
@@ -167,6 +216,15 @@ export const subscriptionRouter = router({
 
     if (!user) {
       throw new TRPCError({ code: "NOT_FOUND", message: "用户不存在" });
+    }
+
+    // 检查缓存
+    const cache = getGlobalCache();
+    const cacheKey = SubscriptionCacheKeys.userSubscription(user.id);
+    const cachedResult = cache.get(cacheKey);
+
+    if (cachedResult) {
+      return cachedResult;
     }
 
     const [sub] = await ctx.db
@@ -204,13 +262,18 @@ export const subscriptionRouter = router({
     const isPro =
       sub.tier !== "free" && sub.status === "active" && !isExpired;
 
-    return {
+    const result = {
       tier: sub.tier,
       status: isExpired ? ("expired" as const) : sub.status,
       isPro,
       plan: planInfo,
       expiresAt: sub.expiresAt,
     };
+
+    // 缓存结果
+    cache.set(cacheKey, result);
+
+    return result;
   }),
 
   /**
