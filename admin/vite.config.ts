@@ -17,6 +17,11 @@ export default defineConfig({
       '/api/trpc': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/trpc/, '/trpc'),
+      },
+      '/trpc': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
       },
     },
   },
