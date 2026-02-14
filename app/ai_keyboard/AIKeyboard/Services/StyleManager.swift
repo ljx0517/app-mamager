@@ -50,7 +50,27 @@ class StyleManager: ObservableObject {
     }
     
     /// 添加自定义风格
-    func addStyle(_ style: SpeakingStyle) {
+    /// - Parameters:
+    ///   - style: 要添加的风格
+    ///   - subscriptionManager: 订阅管理器，用于权限检查（可选）
+    /// - Throws: 如果用户没有权限添加自定义风格
+    func addStyle(_ style: SpeakingStyle, subscriptionManager: SubscriptionManager? = nil) throws {
+        // 权限检查
+        if let manager = subscriptionManager {
+            let customStylesCount = styles.filter { !$0.isBuiltIn }.count
+            if !manager.canCreateCustomStyle(currentCount: customStylesCount) {
+                let limit = manager.getCustomStyleLimit()
+                throw NSError(
+                    domain: "StyleManager",
+                    code: 403,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "无法添加更多自定义风格",
+                        NSLocalizedRecoverySuggestionErrorKey: "免费用户最多可创建 \(limit) 个自定义风格。升级到 Pro 版可享受无限制自定义风格。"
+                    ]
+                )
+            }
+        }
+
         styles.append(style)
         saveCustomStyles()
         NotificationCenter.default.post(name: AppConstants.Notification.styleUpdated, object: nil)
@@ -82,10 +102,41 @@ class StyleManager: ObservableObject {
     // MARK: - 选中风格管理
     
     /// 切换风格选中状态
-    func toggleStyleSelection(_ styleID: UUID) {
+    /// 切换风格选择状态
+    /// - Parameters:
+    ///   - styleID: 风格ID
+    ///   - subscriptionManager: 订阅管理器，用于权限检查（可选）
+    /// - Throws: 如果用户没有权限选择更多基础风格
+    func toggleStyleSelection(_ styleID: UUID, subscriptionManager: SubscriptionManager? = nil) throws {
         if selectedStyleIDs.contains(styleID) {
+            // 取消选择不需要权限检查
             selectedStyleIDs.remove(styleID)
         } else {
+            // 检查是否有权限选择更多基础风格
+            if let manager = subscriptionManager {
+                // 获取要选择的风格
+                guard let style = styles.first(where: { $0.id == styleID }) else { return }
+
+                // 只对基础风格进行限制检查
+                if style.isBuiltIn {
+                    let selectedBaseStylesCount = styles.filter {
+                        selectedStyleIDs.contains($0.id) && $0.isBuiltIn
+                    }.count
+
+                    if !manager.canAddMoreBaseStyle(currentCount: selectedBaseStylesCount) {
+                        let limit = manager.getBaseStyleLimit()
+                        throw NSError(
+                            domain: "StyleManager",
+                            code: 403,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: "无法选择更多基础风格",
+                                NSLocalizedRecoverySuggestionErrorKey: "免费用户最多可选择 \(limit) 个基础风格。升级到 Pro 版可享受无限制风格选择。"
+                            ]
+                        )
+                    }
+                }
+            }
+
             selectedStyleIDs.insert(styleID)
         }
         saveSelectedStyles()
