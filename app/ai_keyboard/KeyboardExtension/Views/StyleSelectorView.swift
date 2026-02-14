@@ -32,7 +32,9 @@ struct StyleSelectorView: View {
         }
         .buttonStyle(.plain)
         .sheet(isPresented: $showingStylePicker) {
-            KeyboardStylePickerView()
+            // TODO: 修复 KeyboardStylePickerView 引用问题
+            Text("风格选择器")
+                .presentationDetents([.medium])
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("KeyboardStyleChanged"))) { _ in
             // 当风格变化时，可以在这里更新显示

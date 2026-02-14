@@ -7,6 +7,7 @@ import {
 import { createContext } from "./trpc/context.js";
 import { appRouter, type AppRouter } from "./trpc/router.js";
 import { checkEmailConfig } from "./utils/email.js";
+import { registerRestAdapter } from "./routers/rest-adapter.js";
 
 /**
  * 多 App 管理后台服务
@@ -56,6 +57,9 @@ async function main() {
     } satisfies FastifyTRPCPluginOptions<AppRouter>["trpcOptions"],
   });
 
+  // 注册 REST 适配层路由
+  await registerRestAdapter(server);
+
   // 健康检查端点
   server.get("/health", async () => {
     return {
@@ -78,10 +82,12 @@ async function main() {
 ╠═══════════════════════════════════════════════════╣
 ║  地址:   http://${host}:${port}                     ║
 ║  tRPC:   http://${host}:${port}/trpc                ║
+║  REST:   http://${host}:${port}/api/*               ║
 ║  健康:   http://${host}:${port}/health              ║
 ╠═══════════════════════════════════════════════════╣
 ║  管理后台:  admin.* / app.*                        ║
 ║  客户端:    user.* / ai.* / style.* / subscription.*║
+║  REST适配: /api/user/* /api/ai/* /api/subscription/*║
 ╚═══════════════════════════════════════════════════╝
     `);
   } catch (err) {

@@ -93,10 +93,113 @@ final class AIKeyboardTests: XCTestCase {
     }
     
     // MARK: - AppConstants Tests
-    
+
     func testFreeUserLimits() {
         XCTAssertEqual(AppConstants.freeReplyLimitPerDay, 10)
         XCTAssertEqual(AppConstants.freeCandidateCount, 1)
+    }
+
+    // MARK: - DailyUsageManager Tests
+
+    func testDailyUsageManagerProUser() {
+        let proStatus = SubscriptionStatus(
+            tier: .proMonthly,
+            isActive: true,
+            expirationDate: Date().addingTimeInterval(86400 * 30),
+            isInTrialPeriod: false,
+            willAutoRenew: true
+        )
+
+        let result = DailyUsageManager.shared.canGenerateReply(subscriptionStatus: proStatus)
+        XCTAssertTrue(result.canGenerate, "Pro 用户应可以生成回复")
+        XCTAssertEqual(result.remainingCount, Int.max, "Pro 用户剩余次数应为无限")
+        XCTAssertEqual(result.limit, Int.max, "Pro 用户限制应为无限")
+    }
+
+    func testDailyUsageManagerFreeUserWithinLimit() {
+        let freeStatus = SubscriptionStatus.free
+
+        // 模拟重置计数
+        UserDefaults.shared.set(0, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2024-01-01", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        let result = DailyUsageManager.shared.canGenerateReply(subscriptionStatus: freeStatus)
+        XCTAssertTrue(result.canGenerate, "免费用户在限制内应可以生成回复")
+        XCTAssertEqual(result.remainingCount, 10, "免费用户初始剩余次数应为 10")
+        XCTAssertEqual(result.limit, 10, "免费用户限制应为 10")
+    }
+
+    func testDailyUsageManagerFreeUserExceedsLimit() {
+        let freeStatus = SubscriptionStatus.free
+
+        // 模拟已达到限制
+        UserDefaults.shared.set(10, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2024-01-01", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        let result = DailyUsageManager.shared.canGenerateReply(subscriptionStatus: freeStatus)
+        XCTAssertFalse(result.canGenerate, "免费用户达到限制后不应可以生成回复")
+        XCTAssertEqual(result.remainingCount, 0, "免费用户达到限制后剩余次数应为 0")
+        XCTAssertEqual(result.limit, 10, "免费用户限制应为 10")
+    }
+
+    func testDailyUsageManagerRecordUsage() {
+        let freeStatus = SubscriptionStatus.free
+
+        // 重置计数
+        UserDefaults.shared.set(0, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2024-01-01", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        // 记录使用
+        DailyUsageManager.shared.recordReplyUsage(subscriptionStatus: freeStatus)
+
+        let count = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        XCTAssertEqual(count, 1, "记录使用后计数应为 1")
+    }
+
+    func testDailyUsageManagerDateReset() {
+        let freeStatus = SubscriptionStatus.free
+
+        // 模拟昨天使用了 5 次
+        UserDefaults.shared.set(5, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2023-12-31", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        let result = DailyUsageManager.shared.canGenerateReply(subscriptionStatus: freeStatus)
+        XCTAssertTrue(result.canGenerate, "新的一天应重置计数")
+        XCTAssertEqual(result.remainingCount, 10, "新的一天剩余次数应为 10")
+
+        // 检查是否已重置
+        let newCount = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        XCTAssertEqual(newCount, 0, "新的一天计数应重置为 0")
+    }
+
+    func testDailyUsageManagerGetUsageInfo() {
+        let freeStatus = SubscriptionStatus.free
+
+        // 模拟使用了 3 次
+        UserDefaults.shared.set(3, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2024-01-01", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        let info = DailyUsageManager.shared.getUsageInfo(subscriptionStatus: freeStatus)
+        XCTAssertEqual(info.used, 3, "已使用次数应为 3")
+        XCTAssertEqual(info.remaining, 7, "剩余次数应为 7")
+        XCTAssertEqual(info.limit, 10, "限制应为 10")
+        XCTAssertFalse(info.isPro, "免费用户 isPro 应为 false")
+    }
+
+    func testDailyUsageManagerResetDailyCount() {
+        // 模拟有数据
+        UserDefaults.shared.set(5, forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        UserDefaults.shared.set("2024-01-01", forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        // 重置
+        DailyUsageManager.shared.resetDailyCount()
+
+        let count = UserDefaults.shared.integer(forKey: AppConstants.UserDefaultsKey.dailyReplyCount)
+        let date = UserDefaults.shared.string(forKey: AppConstants.UserDefaultsKey.lastReplyDate)
+
+        XCTAssertEqual(count, 0, "重置后计数应为 0")
+        XCTAssertNotNil(date, "重置后应有日期")
+    }
         XCTAssertEqual(AppConstants.freeStyleCount, 3)
     }
 }

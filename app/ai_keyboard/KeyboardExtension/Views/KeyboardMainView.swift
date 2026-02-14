@@ -27,6 +27,10 @@ struct KeyboardMainView: View {
             toolBar
         }
         .background(Color(.systemBackground))
+        // 视图出现时更新使用信息
+        .onAppear {
+            updateUsageInfo()
+        }
         // 监听剪贴板内容变化，自动清除旧回复
         .onChange(of: clipboardHelper.clipboardText) { _ in
             if clipboardHelper.contentDidChange {
@@ -41,6 +45,14 @@ struct KeyboardMainView: View {
             AppLogger.keyboard.info("🎨 [Keyboard] 收到风格变化通知，刷新风格显示")
             // 重新加载风格以更新显示
             _ = loadStylePrompt() // 调用loadStylePrompt会更新selectedStyleNames
+        }
+        // 显示升级提示
+        .sheet(isPresented: $showUpgradePrompt) {
+            UpgradeProView(
+                usedCount: usageInfo.used,
+                limit: usageInfo.limit,
+                onDismiss: { showUpgradePrompt = false }
+            )
         }
     }
     
@@ -124,13 +136,31 @@ struct KeyboardMainView: View {
                 }
                 .frame(height: 160)
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     Image(systemName: "text.bubble")
                         .font(.title2)
                         .foregroundStyle(.secondary.opacity(0.5))
+
                     Text("复制对方的消息，即可生成智能回复")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    // 免费用户显示使用计数
+                    if !subscriptionStatus.isPro {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("今日剩余: \(usageInfo.remaining)/\(usageInfo.limit)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(Capsule())
+                    }
                 }
                 .frame(height: 160)
             }
@@ -281,5 +311,10 @@ struct KeyboardMainView: View {
         }
 
         return "请用自然、友好的语气回复。"
+    }
+
+    /// 获取当前使用信息并更新状态
+    private func updateUsageInfo() {
+        usageInfo = DailyUsageManager.shared.getUsageInfo(subscriptionStatus: subscriptionStatus)
     }
 }
