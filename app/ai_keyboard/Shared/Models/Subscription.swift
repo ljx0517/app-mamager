@@ -1,7 +1,7 @@
 import Foundation
 
 /// 订阅方案类型
-enum SubscriptionTier: String, Codable, CaseIterable {
+public enum SubscriptionTier: String, Codable, CaseIterable {
     case free = "free"
     case proMonthly = "pro_monthly"
     case proYearly = "pro_yearly"
@@ -38,7 +38,7 @@ enum SubscriptionTier: String, Codable, CaseIterable {
 }
 
 /// 订阅状态模型
-struct SubscriptionStatus: Codable {
+public struct SubscriptionStatus: Codable {
     var tier: SubscriptionTier
     var isActive: Bool
     var expirationDate: Date?

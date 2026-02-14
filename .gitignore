@@ -1,3 +1,6 @@
 .idea
 .spec-workflow
 
+# Memory system database files
+*.db
+

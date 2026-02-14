@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Card,
   Table,
@@ -11,6 +11,7 @@ import {
   DatePicker,
   Empty,
   message,
+  Spin,
 } from 'antd'
 import {
   ReloadOutlined,
@@ -29,39 +30,43 @@ import {
   SUBSCRIPTION_STATUS_LABELS,
   SUBSCRIPTION_STATUS_COLORS,
 } from '@/utils/constants'
+import { trpc } from '@/utils/trpc'
+import { useSmartLoading } from '@/hooks/useLoading'
 
 const { RangePicker } = DatePicker
 
-// ===== 模拟 per-App 订阅数据 =====
+// ===== API 数据转换 =====
 
-const generateMockSubscriptions = (appId: string, count: number): Subscription[] => {
-  const tiers: Subscription['tier'][] = ['pro_monthly', 'pro_yearly']
-  const statuses: Subscription['status'][] = ['active', 'expired', 'cancelled', 'trial']
+/**
+ * 将后端状态映射到前端状态
+ */
+function mapBackendToFrontendStatus(backendStatus?: string): Subscription['status'] {
+  if (!backendStatus) return 'active'
 
-  return Array.from({ length: count }, (_, i) => {
-    const startDate = new Date(2026, Math.floor(Math.random() * 2), Math.floor(Math.random() * 28) + 1)
-    const endDate = new Date(startDate)
-    const tier = tiers[Math.floor(Math.random() * tiers.length)]
-    endDate.setMonth(endDate.getMonth() + (tier === 'pro_yearly' ? 12 : 1))
+  const mapping: Record<string, Subscription['status']> = {
+    active: 'active',
+    expired: 'expired',
+    cancelled: 'cancelled',
+    grace_period: 'active', // 宽限期视为活跃
+    trial: 'trial',
+  }
 
-    return {
-      id: String(i + 1),
-      appId,
-      userId: String(Math.floor(Math.random() * 50) + 1),
-      tier,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      autoRenew: Math.random() > 0.3,
-      transactionId: `TXN_${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-    }
-  })
+  return mapping[backendStatus] || 'active'
 }
 
-const mockSubsByApp: Record<string, Subscription[]> = {
-  app_001: generateMockSubscriptions('app_001', 40),
-  app_002: generateMockSubscriptions('app_002', 25),
-  app_003: generateMockSubscriptions('app_003', 12),
+/**
+ * 将后端tier映射到前端tier
+ */
+function mapBackendToFrontendTier(backendTier?: string): Subscription['tier'] {
+  if (!backendTier) return 'pro_monthly'
+
+  const mapping: Record<string, Subscription['tier']> = {
+    free: 'free',
+    pro_monthly: 'pro_monthly',
+    pro_yearly: 'pro_yearly',
+  }
+
+  return mapping[backendTier] || 'pro_monthly'
 }
 
 export default function SubscriptionsPage() {
@@ -70,43 +75,111 @@ export default function SubscriptionsPage() {
 
   const [tierFilter, setTierFilter] = useState<string | undefined>()
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
-  const [loading, setLoading] = useState(false)
+  const [manualLoading, setManualLoading] = useState(false)
 
-  const allSubs = currentAppId ? (mockSubsByApp[currentAppId] ?? []) : []
+  // 使用 tRPC 获取订阅数据
+  const { data: subscriptionsData, isLoading: isLoadingSubs, refetch: refetchSubs } = trpc.subscriptionManage.listSubscriptions.useQuery(
+    {
+      appId: currentAppId || '',
+      status: statusFilter as any,
+      tier: tierFilter as any,
+      limit: 100,
+    },
+    {
+      enabled: !!currentAppId,
+      refetchOnWindowFocus: false,
+    }
+  )
 
-  const stats = {
-    totalActive: allSubs.filter((s) => s.status === 'active').length,
-    totalMonthly: allSubs.filter((s) => s.tier === 'pro_monthly' && s.status === 'active').length,
-    totalYearly: allSubs.filter((s) => s.tier === 'pro_yearly' && s.status === 'active').length,
-    totalTrial: allSubs.filter((s) => s.status === 'trial').length,
-  }
+  // 使用 tRPC 获取订阅统计
+  const { data: statsData, isLoading: isLoadingStats } = trpc.subscriptionManage.stats.useQuery(
+    {
+      appId: currentAppId || '',
+    },
+    {
+      enabled: !!currentAppId,
+      refetchOnWindowFocus: false,
+    }
+  )
 
-  const filteredData = allSubs.filter((sub) => {
-    const matchTier = !tierFilter || sub.tier === tierFilter
-    const matchStatus = !statusFilter || sub.status === statusFilter
-    return matchTier && matchStatus
-  })
+  // 组合加载状态
+  const { isLoading: smartLoading } = useSmartLoading(isLoadingSubs || isLoadingStats)
+  const loading = smartLoading || manualLoading
 
-  const handleRefresh = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
+  // 转换后端数据到前端格式
+  const allSubs = useMemo(() => {
+    if (!subscriptionsData) return []
+
+    return subscriptionsData.map((sub: any) => ({
+      id: sub.id,
+      appId: sub.appId || currentAppId || '',
+      userId: sub.userId,
+      tier: mapBackendToFrontendTier(sub.tier),
+      status: mapBackendToFrontendStatus(sub.status),
+      startDate: sub.startDate,
+      endDate: sub.endDate,
+      autoRenew: sub.autoRenew || false,
+      transactionId: sub.transactionId,
+      planId: sub.planId,
+    }))
+  }, [subscriptionsData, currentAppId])
+
+  // 使用后端统计或计算前端统计
+  const stats = useMemo(() => {
+    if (statsData) {
+      return {
+        totalActive: statsData.active || 0,
+        totalMonthly: statsData.monthly || 0,
+        totalYearly: statsData.yearly || 0,
+        totalTrial: statsData.trial || 0,
+      }
+    }
+
+    // 如果没有后端统计，使用前端计算
+    return {
+      totalActive: allSubs.filter((s) => s.status === 'active').length,
+      totalMonthly: allSubs.filter((s) => s.tier === 'pro_monthly' && s.status === 'active').length,
+      totalYearly: allSubs.filter((s) => s.tier === 'pro_yearly' && s.status === 'active').length,
+      totalTrial: allSubs.filter((s) => s.status === 'trial').length,
+    }
+  }, [statsData, allSubs])
+
+  const filteredData = allSubs
+
+  const handleRefresh = async () => {
+    setManualLoading(true)
+    try {
+      await Promise.all([refetchSubs()])
       message.success('数据已刷新')
-    }, 500)
+    } catch (error) {
+      message.error('刷新失败，请重试')
+    } finally {
+      setManualLoading(false)
+    }
   }
 
   const columns: ColumnsType<Subscription> = [
-    { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-    { title: '用户 ID', dataIndex: 'userId', key: 'userId', width: 80 },
-    { title: '交易号', dataIndex: 'transactionId', key: 'transactionId', ellipsis: true },
+    { title: 'ID', dataIndex: 'id', key: 'id', width: 80, ellipsis: true },
+    { title: '用户 ID', dataIndex: 'userId', key: 'userId', width: 100, ellipsis: true },
+    { title: '交易号', dataIndex: 'transactionId', key: 'transactionId', width: 150, ellipsis: true },
     {
       title: '方案',
       dataIndex: 'tier',
       key: 'tier',
       width: 120,
+      filters: [
+        { text: 'Pro 月度', value: 'pro_monthly' },
+        { text: 'Pro 年度', value: 'pro_yearly' },
+        { text: '免费', value: 'free' },
+      ],
+      onFilter: (value, record) => record.tier === value,
       render: (tier: string) => {
-        const colors: Record<string, string> = { pro_monthly: 'gold', pro_yearly: 'purple' }
-        return <Tag color={colors[tier]}>{SUBSCRIPTION_TIER_LABELS[tier]}</Tag>
+        const colors: Record<string, string> = {
+          free: 'blue',
+          pro_monthly: 'gold',
+          pro_yearly: 'purple'
+        }
+        return <Tag color={colors[tier]}>{SUBSCRIPTION_TIER_LABELS[tier] || tier}</Tag>
       },
     },
     {
@@ -114,8 +187,15 @@ export default function SubscriptionsPage() {
       dataIndex: 'status',
       key: 'status',
       width: 100,
+      filters: [
+        { text: '活跃', value: 'active' },
+        { text: '试用中', value: 'trial' },
+        { text: '已过期', value: 'expired' },
+        { text: '已取消', value: 'cancelled' },
+      ],
+      onFilter: (value, record) => record.status === value,
       render: (status: string) => (
-        <Tag color={SUBSCRIPTION_STATUS_COLORS[status]}>{SUBSCRIPTION_STATUS_LABELS[status]}</Tag>
+        <Tag color={SUBSCRIPTION_STATUS_COLORS[status]}>{SUBSCRIPTION_STATUS_LABELS[status] || status}</Tag>
       ),
     },
     {
@@ -130,20 +210,29 @@ export default function SubscriptionsPage() {
       dataIndex: 'startDate',
       key: 'startDate',
       width: 120,
-      render: (d: string) => new Date(d).toLocaleDateString('zh-CN'),
-      sorter: (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      render: (d: string) => d ? new Date(d).toLocaleDateString('zh-CN') : '-',
+      sorter: (a, b) => new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime(),
     },
     {
       title: '到期时间',
       dataIndex: 'endDate',
       key: 'endDate',
       width: 120,
-      render: (d: string) => new Date(d).toLocaleDateString('zh-CN'),
-      sorter: (a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime(),
+      render: (d: string) => d ? new Date(d).toLocaleDateString('zh-CN') : '-',
+      sorter: (a, b) => new Date(a.endDate || 0).getTime() - new Date(b.endDate || 0).getTime(),
     },
   ]
 
   if (!currentApp) {
+    return (
+      <div>
+        <PageHeader title="订阅管理" subtitle="请先选择一个应用" breadcrumbs={[{ title: '订阅管理' }]} />
+        <Card style={{ borderRadius: 12 }}><Empty description="请先选择一个应用" /></Card>
+      </div>
+    )
+  }
+
+  if (!currentAppId) {
     return (
       <div>
         <PageHeader title="订阅管理" subtitle="请先选择一个应用" breadcrumbs={[{ title: '订阅管理' }]} />
@@ -208,15 +297,28 @@ export default function SubscriptionsPage() {
           </Space>
         </div>
 
-        <Table
-          dataSource={filteredData}
-          columns={columns}
-          rowKey="id"
-          loading={loading}
-          pagination={{ showSizeChanger: true, showQuickJumper: true, showTotal: (total) => `共 ${total} 条记录` }}
-          scroll={{ x: 900 }}
-          size="middle"
-        />
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <Spin size="large" />
+          </div>
+        ) : filteredData.length === 0 ? (
+          <Empty description={currentAppId ? "暂无订阅数据" : "请先选择一个应用"} />
+        ) : (
+          <Table
+            dataSource={filteredData}
+            columns={columns}
+            rowKey="id"
+            loading={manualLoading}
+            pagination={{
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => `共 ${total} 条记录`,
+              pageSize: 20,
+            }}
+            scroll={{ x: 1000 }}
+            size="middle"
+          />
+        )}
       </Card>
     </div>
   )
