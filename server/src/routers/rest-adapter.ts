@@ -1,6 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { TRPCError } from "@trpc/server";
-import { createCallerFactory } from "@trpc/server";
+import { TRPCError, callTRPCProcedure } from "@trpc/server";
 import { appRouter } from "../trpc/router.js";
 import { createContext } from "../trpc/context.js";
 
@@ -46,15 +45,32 @@ function mapTRPCErrorToHTTP(error: TRPCError): { statusCode: number; message: st
 
 /**
  * 创建 tRPC 调用器
+ * 使用 callTRPCProcedure 直接调用过程，避免 createCallerFactory
  */
 async function createTRPCCaller(req: any, res: any) {
   const context = await createContext({ req, res });
 
-  // 使用 createCallerFactory 创建调用器
-  const createCaller = createCallerFactory(appRouter);
-  const caller = createCaller(context);
-
-  return caller;
+  // 返回一个代理对象，将 query/mutation 调用转发给 callTRPCProcedure
+  return {
+    query: async (path: string) => {
+      return await callTRPCProcedure({
+        ctx: context,
+        path,
+        input: undefined,
+        type: 'query',
+        router: appRouter,
+      });
+    },
+    mutation: async (path: string, input: unknown) => {
+      return await callTRPCProcedure({
+        ctx: context,
+        path,
+        input,
+        type: 'mutation',
+        router: appRouter,
+      });
+    },
+  };
 }
 
 /**
