@@ -41,6 +41,10 @@ export default function LoginPage() {
   })
 
   const handleLogin = async (values: LoginFormValues) => {
+    console.log('🔍 handleLogin called with values:', values)
+    console.log('🔍 loginMutation:', loginMutation)
+    console.log('🔍 trpc.admin.login:', trpc.admin.login)
+    console.log('🔍 trpc object:', trpc)
     loginMutation.mutate(values)
   }
 
