@@ -11,6 +11,7 @@ import {
   jsonb,
   pgEnum,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ==================== 枚举定义 ====================
@@ -49,6 +50,14 @@ export const billingPeriodEnum = pgEnum("billing_period", [
   "yearly",
   "lifetime",
   "custom",
+]);
+
+/** 用户状态 */
+export const userStatusEnum = pgEnum("user_status", [
+  "active",
+  "disabled",
+  "suspended",
+  "pending_verification",
 ]);
 
 // ==================== 管理后台表 ====================
@@ -209,6 +218,7 @@ export const users = pgTable(
     deviceId: varchar("device_id", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }),
     passwordHash: varchar("password_hash", { length: 255 }),
+    status: userStatusEnum("status").default("active").notNull(),
     emailVerified: boolean("email_verified").default(false).notNull(),
     verificationToken: varchar("verification_token", { length: 255 }),
     verificationTokenExpires: timestamp("verification_token_expires", { withTimezone: true }),
@@ -274,19 +284,48 @@ export const styles = pgTable("styles", {
 });
 
 /** 使用记录表（每日用量统计） */
-export const usageRecords = pgTable("usage_records", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .references(() => users.id, { onDelete: "cascade" })
-    .notNull(),
-  date: date("date").defaultNow().notNull(),
-  replyCount: integer("reply_count").default(0).notNull(),
-});
+export const usageRecords = pgTable(
+  "usage_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    date: date("date").defaultNow().notNull(),
+    /** 回复数量（向后兼容） */
+    replyCount: integer("reply_count").default(0).notNull(),
+    /** AI 调用 token 数量 */
+    tokenCount: integer("token_count").default(0),
+    /** AI 提供商类型 */
+    aiProvider: varchar("ai_provider", { length: 50 }),
+    /** 使用的模型名称 */
+    model: varchar("model", { length: 100 }),
+    /** 调用是否成功 */
+    success: boolean("success").default(true),
+    /** 调用耗时（毫秒） */
+    durationMs: integer("duration_ms"),
+    /** 错误信息（如调用失败） */
+    errorMessage: text("error_message"),
+  },
+  (table) => [
+    /** 按用户和时间查询使用记录 */
+    index("usage_user_date_idx").on(table.userId, table.date),
+    /** 按 AI 提供商和时间范围查询统计 */
+    index("usage_ai_provider_date_idx").on(table.aiProvider, table.date),
+    /** 按模型和时间范围查询统计 */
+    index("usage_model_date_idx").on(table.model, table.date),
+    /** 按成功状态和时间查询 */
+    index("usage_success_date_idx").on(table.success, table.date),
+  ]
+);
 
 // ==================== 类型导出 ====================
 
 export type Admin = typeof admins.$inferSelect;
 export type NewAdmin = typeof admins.$inferInsert;
+
+/** 用户状态类型 */
+export type UserStatus = "active" | "disabled" | "suspended" | "pending_verification";
 
 export type App = typeof apps.$inferSelect;
 export type NewApp = typeof apps.$inferInsert;

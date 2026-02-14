@@ -40,9 +40,9 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## 📊 接口总览
 
-- **总接口数**: 45 个（tRPC 接口 44 个 + 健康检查 1 个）
-- **认证分布**: public(2) / app(11) / protected(13) / admin(18)
-- **HTTP 方法**: GET(10) / POST(34)
+- **总接口数**: 83 个（tRPC 接口 82 个 + 健康检查 1 个）
+- **认证分布**: public(2) / app(11) / protected(13) / admin(56)
+- **HTTP 方法**: GET(20) / POST(62)
 
 ## 🗂️ 详细接口列表
 
@@ -702,6 +702,755 @@ Array<{
 
 ---
 
+### 9. 用户管理（后台）(`userManage.*`)
+
+管理指定应用下的用户账户，支持列表查询、详情查看、状态管理操作。
+
+#### `userManage.list` - 获取用户列表
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/userManage.list` |
+| **功能** | 获取用户列表（分页、搜索、筛选、排序） |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+  search?: string;  // 搜索关键词（设备ID、邮箱）
+  status?: "active" | "disabled" | "suspended" | "pending_verification";  // 状态筛选
+  emailVerified?: boolean;  // 邮箱验证状态筛选
+  subscriptionTier?: "free" | "pro_monthly" | "pro_yearly";  // 订阅层级筛选
+  sortBy?: "createdAt" | "lastLoginAt" | "email" | "deviceId";  // 排序字段
+  sortOrder?: "asc" | "desc";  // 排序方向
+  limit?: number;  // 分页大小（1-100，默认50）
+  offset?: number;  // 分页偏移（默认0）
+}
+```
+
+**响应**:
+```typescript
+{
+  items: Array<{
+    user: {
+      id: string;
+      deviceId: string;
+      email: string | null;
+      emailVerified: boolean;
+      status: string;
+      lastLoginAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    subscription: {
+      userId: string;
+      tier: string;
+      status: string;
+      expiresAt: Date | null;
+      planName: string | null;
+    } | null;
+    hasActiveSubscription: boolean;
+  }>;
+  total: number;    // 总记录数
+  limit: number;    // 每页数量
+  offset: number;   // 当前偏移
+  hasMore: boolean; // 是否有更多数据
+}
+```
+
+#### `userManage.detail` - 获取用户详情
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/userManage.detail` |
+| **功能** | 获取用户详情（包含完整信息、订阅历史、使用统计） |
+
+**请求参数**:
+```typescript
+{
+  userId: string;  // 用户 ID
+}
+```
+
+**响应**:
+```typescript
+{
+  user: {
+    id: string;
+    deviceId: string;
+    email: string | null;
+    status: string;
+    emailVerified: boolean;
+    lastLoginAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    // 隐藏敏感信息：passwordHash, verificationToken 等
+  };
+  app: {
+    id: string;
+    name: string;
+    bundleId: string;
+  };
+  activeSubscription: {
+    subscription: Subscription;
+    plan: {
+      id: string;
+      name: string;
+      productId: string;
+      priceCents: number;
+      currency: string;
+    };
+  } | null;
+  subscriptionHistory: Array<{
+    subscription: Subscription;
+    plan: {
+      id: string;
+      name: string;
+      productId: string;
+      priceCents: number;
+      currency: string;
+    };
+  }>;
+  usageStats: {
+    recent30Days: Array<{
+      date: Date;
+      totalReplies: number;
+      totalTokens: number;
+      successfulCalls: number;
+      failedCalls: number;
+    }>;
+    summary: {
+      totalReplies: number;
+      totalTokens: number;
+      totalCalls: number;
+      successRate: string;  // 百分比，如 "95.5"
+    };
+  };
+  providerStats: Array<{
+    aiProvider: string | null;
+    model: string | null;
+    callCount: number;
+    totalTokens: number;
+    avgDuration: number;
+    successRate: number;
+  }>;
+}
+```
+
+#### `userManage.disable` - 禁用用户账户
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.disable` |
+| **功能** | 禁用用户账户 |
+
+**请求参数**:
+```typescript
+{
+  userId: string;   // 用户 ID
+  reason?: string;  // 禁用原因（可选）
+}
+```
+
+**响应**:
+```typescript
+{
+  user: User;      // 更新后的用户信息
+  message: string; // 操作结果消息
+}
+```
+
+#### `userManage.enable` - 启用用户账户
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.enable` |
+| **功能** | 启用用户账户 |
+
+**请求参数**:
+```typescript
+{
+  userId: string;   // 用户 ID
+  reason?: string;  // 启用原因（可选）
+}
+```
+
+#### `userManage.suspend` - 暂停用户（临时限制）
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.suspend` |
+| **功能** | 暂停用户（临时限制） |
+
+**请求参数**:
+```typescript
+{
+  userId: string;      // 用户 ID
+  reason: string;      // 暂停原因（必需）
+  durationDays?: number;  // 暂停时长（天，可选）
+}
+```
+
+**响应**:
+```typescript
+{
+  user: User;      // 更新后的用户信息
+  message: string; // 操作结果消息（包含预计恢复时间）
+}
+```
+
+#### `userManage.resetPassword` - 重置用户密码
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.resetPassword` |
+| **功能** | 重置用户密码（可指定新密码或生成随机密码） |
+
+**请求参数**:
+```typescript
+{
+  userId: string;          // 用户 ID
+  newPassword?: string;    // 新密码（可选，不提供则生成随机密码）
+  forceChange?: boolean;   // 是否要求用户下次登录时修改密码（默认 true）
+}
+```
+
+**响应**:
+```typescript
+{
+  success: boolean;           // 操作是否成功
+  message: string;            // 操作结果消息
+  generatedPassword?: string; // 生成的随机密码（仅开发环境返回）
+  forceChange: boolean;       // 是否要求用户下次登录时修改密码
+}
+```
+
+#### `userManage.verifyEmailManually` - 手动验证用户邮箱
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.verifyEmailManually` |
+| **功能** | 手动验证用户邮箱（跳过邮件验证流程） |
+
+**请求参数**:
+```typescript
+{
+  userId: string;  // 用户 ID
+}
+```
+
+**响应**:
+```typescript
+{
+  user: User;      // 更新后的用户信息
+  message: string; // 操作结果消息
+}
+```
+
+#### `userManage.delete` - 删除用户
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/userManage.delete` |
+| **功能** | 删除用户（支持软删除和硬删除） |
+
+**请求参数**:
+```typescript
+{
+  userId: string;      // 用户 ID
+  hardDelete?: boolean;  // 是否硬删除（永久删除，默认 false）
+  reason?: string;      // 删除原因（可选）
+}
+```
+
+**响应**（软删除）:
+```typescript
+{
+  user: User;      // 更新后的用户信息（标记为禁用并清除敏感信息）
+  message: string; // 操作结果消息
+}
+```
+
+**响应**（硬删除）:
+```typescript
+{
+  success: boolean;  // 操作是否成功
+  message: string;   // 操作结果消息
+}
+```
+
+---
+
+### 10. 数据分析 (`analytics.*`)
+
+提供应用级别的数据分析和业务洞察。
+
+#### `analytics.usage` - 使用量统计分析
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/analytics.usage` |
+| **功能** | 使用量统计分析（时间趋势、分布、热门风格） |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+  startDate: string;  // 开始日期（YYYY-MM-DD）
+  endDate: string;    // 结束日期（YYYY-MM-DD）
+  granularity?: "day" | "week" | "month";  // 时间粒度（默认 "day"）
+  groupByTier?: boolean;    // 是否按用户层级分组（默认 false）
+  groupByProvider?: boolean;  // 是否按AI提供商分组（默认 false）
+}
+```
+
+**响应**:
+```typescript
+{
+  timeSeries: Array<{
+    timePeriod: string;    // 时间区间
+    totalReplies: number;  // 总回复数
+    totalTokens: number;   // 总token数
+    successfulCalls: number;  // 成功调用数
+    failedCalls: number;      // 失败调用数
+    uniqueUsers: number;      // 独立用户数
+    successRate: number;      // 成功率（百分比）
+  }>;
+  summary: {
+    totalUsers: number;       // 总用户数
+    activeUsers: number;      // 活跃用户数
+    totalReplies: number;     // 总回复数
+    totalTokens: number;      // 总token数
+    avgTokensPerReply: number; // 平均每回复token数
+    successRate: number;      // 总成功率（百分比）
+  };
+  distribution: {
+    byTier: Record<string, {  // 按订阅层级分布
+      totalReplies: number;
+      totalTokens: number;
+      userCount: number;
+    }>;
+    byProvider: Record<string, {  // 按AI提供商分布
+      callCount: number;
+      totalTokens: number;
+      avgDuration: number;
+      successRate: number;
+    }>;
+    popularStyles: Array<{  // 热门风格分析
+      styleId: string;
+      styleName: string;
+      usageCount: number;
+    }>;
+  };
+}
+```
+
+#### `analytics.revenue` - 收入与订阅分析
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/analytics.revenue` |
+| **功能** | 收入与订阅分析（MRR、ARR、转化漏斗等） |
+
+**请求参数**:
+```typescript
+{
+  appId: string;      // 应用 ID
+  startDate: string;  // 开始日期（YYYY-MM-DD）
+  endDate: string;    // 结束日期（YYYY-MM-DD）
+  currency?: string;  // 货币代码（默认 "CNY"）
+}
+```
+
+**响应**:
+```typescript
+{
+  mrr: number;        // 月度经常性收入
+  arr: number;        // 年度经常性收入
+  totalRevenue: number;  // 总收入
+  subscriptionStats: {
+    total: number;    // 总订阅数
+    active: number;   // 活跃订阅数
+    cancelled: number; // 已取消订阅数
+    expired: number;   // 已过期订阅数
+  };
+  conversionFunnel: {
+    totalUsers: number;     // 总用户数
+    freeUsers: number;      // 免费用户数
+    proUsers: number;       // Pro用户数
+    conversionRate: number; // 总转化率（百分比）
+    freeToProConversion: number; // 免费转Pro转化率（百分比）
+  };
+  planPerformance: Array<{
+    planId: string;        // 计划ID
+    planName: string;      // 计划名称
+    billingPeriod: string; // 计费周期
+    price: number;         // 价格（元）
+    currency: string;      // 货币
+    activeSubscriptions: number;  // 活跃订阅数
+    monthlyRevenue: number;       // 月收入
+    features: string[];    // 功能列表
+  }>;
+  revenueTrend: Array<{
+    month: string;         // 月份
+    revenue: number;       // 收入
+    newSubscriptions: number;  // 新订阅数
+  }>;
+  currency: string;        // 货币代码
+}
+```
+
+#### `analytics.growth` - 用户增长与留存分析
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/analytics.growth` |
+| **功能** | 用户增长与留存分析（同期群分析） |
+
+**请求参数**:
+```typescript
+{
+  appId: string;            // 应用 ID
+  periods?: number;         // 分析周期数（默认为12个月）
+  periodType?: "month" | "week";  // 周期类型（默认 "month"）
+}
+```
+
+**响应**:
+```typescript
+{
+  userGrowth: Array<{
+    period: string;       // 时间区间
+    newUsers: number;     // 新用户数
+    activeUsers: number;  // 活跃用户数
+    growthRate: number;   // 增长率
+  }>;
+  retention: {
+    day1: number;   // 1日留存率（百分比）
+    day7: number;   // 7日留存率（百分比）
+    day30: number;  // 30日留存率（百分比）
+  };
+  cohortAnalysis: Array<{
+    cohortPeriod: string;           // 同期群标识（如 "2026-01"）
+    totalUsers: number;             // 同期群总用户数
+    retention: Record<string, number>;  // 各周期留存率（period_0, period_1, ...）
+  }>;
+  activityLevels: {
+    daily: number;    // 日活跃用户数
+    weekly: number;   // 周活跃用户数
+    monthly: number;  // 月活跃用户数
+    inactive: number; // 不活跃用户数（>30天）
+  };
+  summary: {
+    totalUsers: number;      // 总用户数
+    activeUsers: number;     // 活跃用户数（月）
+    inactiveUsers: number;   // 不活跃用户数
+    activationRate: number;  // 激活率（百分比）
+  };
+}
+```
+
+#### `analytics.snapshot` - 实时数据快照
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/analytics.snapshot` |
+| **功能** | 获取实时数据快照（仪表盘用） |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+}
+```
+
+**响应**:
+```typescript
+{
+  timestamp: string;  // 时间戳
+  metrics: {
+    totalUsers: number;          // 总用户数
+    todayActiveUsers: number;    // 今日活跃用户
+    activeSubscriptions: number; // 活跃订阅数
+    revenueToday: number;        // 今日收入
+    todayUsage: {
+      totalReplies: number;      // 今日总回复数
+      totalTokens: number;       // 今日总token数
+      successRate: number;       // 今日成功率（百分比）
+    };
+  };
+  health: {
+    database: boolean;      // 数据库健康状态
+    aiServices: boolean;    // AI服务健康状态
+    rateLimiting: boolean;  // 速率限制状态
+  };
+}
+```
+
+---
+
+### 11. 系统配置 (`settings.*`)
+
+管理系统全局配置和应用级别配置。
+
+#### `settings.global` - 获取全局配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/settings.global` |
+| **功能** | 获取全局配置（邮件、AI、功能开关、安全、内容策略） |
+
+**响应**:
+```typescript
+{
+  settings: {
+    email?: {              // 邮件服务配置
+      enabled: boolean;
+      host: string;
+      port: number;
+      secure: boolean;
+      auth: {
+        user: string;
+        pass: string;
+      };
+      fromAddress: string;
+      templates: Record<string, { subject: string; body: string }>;
+    };
+    aiDefaults?: {         // AI服务默认配置
+      defaultProvider: string;
+      fallbackProvider: string;
+      maxRetries: number;
+      timeoutMs: number;
+      rateLimit: {
+        requestsPerMinute: number;
+        tokensPerMinute: number;
+      };
+    };
+    features?: {           // 平台功能开关
+      enableUserRegistration: boolean;
+      enableEmailVerification: boolean;
+      enablePasswordReset: boolean;
+      enableSocialLogin: boolean;
+      enableTwoFactorAuth: boolean;
+      enableUsageAnalytics: boolean;
+      enableAutoScaling: boolean;
+    };
+    security?: {           // 安全配置
+      passwordMinLength: number;
+      passwordRequireSpecialChar: boolean;
+      sessionTimeoutMinutes: number;
+      maxLoginAttempts: number;
+      enableIpWhitelist: boolean;
+      ipWhitelist: string[];
+    };
+    contentPolicy?: {      // 内容策略
+      allowedLanguages: string[];
+      profanityFilter: boolean;
+      maxStyleNameLength: number;
+      maxPromptLength: number;
+      sensitiveTopics: string[];
+    };
+  };
+  appId: string;      // 当前用作全局配置的应用ID
+  appName: string;    // 应用名称
+  message: string;    // 提示信息
+}
+```
+
+#### `settings.updateGlobal` - 更新全局配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/settings.updateGlobal` |
+| **功能** | 更新全局配置 |
+
+**请求参数**: 同 `settings.global` 响应中的 `settings` 对象结构，所有字段可选。
+
+**响应**:
+```typescript
+{
+  settings: AppSettings;  // 更新后的配置
+  message: string;        // 操作结果消息
+}
+```
+
+#### `settings.app` - 获取应用配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/settings.app` |
+| **功能** | 获取应用配置 |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+}
+```
+
+**响应**:
+```typescript
+{
+  appId: string;      // 应用ID
+  appName: string;    // 应用名称
+  settings: AppSettings;  // 应用配置
+  platform: string;   // 平台类型
+  isActive: boolean;  // 是否激活
+  createdAt: Date;    // 创建时间
+  updatedAt: Date;    // 更新时间
+}
+```
+
+#### `settings.updateApp` - 更新应用配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/settings.updateApp` |
+| **功能** | 更新应用配置 |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+  // 基础配置（全部可选）
+  freeReplyLimitPerDay?: number;      // 免费用户每日回复上限
+  freeCandidateCount?: number;        // 免费用户候选回复数
+  proCandidateCount?: number;         // Pro用户候选回复数
+  enableAI?: boolean;                 // 是否启用AI功能
+  enableSubscription?: boolean;       // 是否启用订阅功能
+  // AI提供商配置
+  aiProviders?: Array<{
+    type: "openai" | "anthropic" | "google" | "mock" | "azure_openai" | "unknown";
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+    enabled: boolean;
+    priority: number;
+    retryCount?: number;
+    timeout?: number;
+  }>;
+  defaultAIProvider?: string;         // 默认AI提供商
+  // 自定义功能开关
+  customFeatures?: Record<string, unknown>;  // 应用自定义功能配置
+}
+```
+
+**响应**:
+```typescript
+{
+  appId: string;      // 应用ID
+  appName: string;    // 应用名称
+  settings: AppSettings;  // 更新后的配置
+  message: string;    // 操作结果消息
+}
+```
+
+#### `settings.validateApp` - 验证应用配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/settings.validateApp` |
+| **功能** | 验证应用配置的完整性和有效性 |
+
+**请求参数**:
+```typescript
+{
+  appId: string;  // 应用 ID
+}
+```
+
+**响应**:
+```typescript
+{
+  appId: string;    // 应用ID
+  appName: string;  // 应用名称
+  isValid: boolean; // 配置是否有效（无error级别问题）
+  issues: Array<{
+    level: "error" | "warning" | "info";
+    field: string;
+    message: string;
+    suggestion?: string;
+  }>;
+  summary: {
+    total: number;    // 总问题数
+    errors: number;   // error级别问题数
+    warnings: number; // warning级别问题数
+    info: number;     // info级别问题数
+  };
+}
+```
+
+#### `settings.resetApp` - 重置应用配置
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | POST |
+| **路径** | `/trpc/settings.resetApp` |
+| **功能** | 重置应用配置到默认值 |
+
+**请求参数**:
+```typescript
+{
+  appId: string;   // 应用 ID
+  confirm: boolean; // 确认重置操作（必须为 true）
+}
+```
+
+**响应**:
+```typescript
+{
+  appId: string;      // 应用ID
+  appName: string;    // 应用名称
+  settings: AppSettings;  // 重置后的默认配置
+  message: string;    // 操作结果消息
+}
+```
+
+#### `settings.listApps` - 获取所有应用的配置摘要
+| 属性 | 值 |
+|------|-----|
+| **认证** | adminProcedure |
+| **方法** | GET |
+| **路径** | `/trpc/settings.listApps` |
+| **功能** | 获取所有应用的配置摘要 |
+
+**响应**:
+```typescript
+Array<{
+  id: string;          // 应用ID
+  name: string;        // 应用名称
+  platform: string;    // 平台类型
+  isActive: boolean;   // 是否激活
+  configStatus: "configured" | "default";  // 配置状态
+  userCount: number;   // 用户数
+  subscriptionCount: number;  // 订阅数
+  features: {
+    aiEnabled: boolean;              // 是否启用AI功能
+    subscriptionEnabled: boolean;    // 是否启用订阅功能
+    hasCustomAIProviders: boolean;   // 是否有自定义AI提供商
+  };
+}>
+```
+
+---
+
 ## 🚀 快速开始
 
 ### 1. 服务启动
@@ -808,7 +1557,10 @@ server/
 │   │   ├── ai.ts             # AI 功能
 │   │   ├── style.ts          # 风格管理
 │   │   ├── subscription-manage.ts # 订阅管理（后台）
-│   │   └── subscription.ts   # 订阅功能（客户端）
+│   │   ├── subscription.ts   # 订阅功能（客户端）
+│   │   ├── user-manage.ts    # 用户管理（后台）
+│   │   ├── analytics.ts      # 数据分析
+│   │   └── settings.ts       # 系统配置
 │   ├── db/                   # 数据库相关
 │   │   ├── schema.ts         # 数据模型定义
 │   │   └── index.ts          # 数据库连接
@@ -873,6 +1625,7 @@ A: 在 `src/services/ai/providers/` 目录下创建新的提供商类，实现 `
 | 版本 | 日期 | 更新说明 |
 |------|------|----------|
 | 1.0.0 | 2026-02-13 | 初始版本，包含全部 45 个接口 |
+| 1.1.0 | 2026-02-14 | 新增用户管理、数据分析、系统配置模块，扩展至 83 个接口 |
 
-**最后更新**: 2026-02-13
+**最后更新**: 2026-02-14
 **维护者**: 后端开发团队

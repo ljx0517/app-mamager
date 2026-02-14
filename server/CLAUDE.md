@@ -136,6 +136,9 @@ tRPC 路由分为两大类别：
 - `admin.*` - 管理员认证与管理
 - `app.*` - 应用 CRUD 管理
 - `subscriptionManage.*` - 订阅计划与用户订阅管理
+- `userManage.*` - 用户管理（列表、详情、状态操作）
+- `analytics.*` - 数据分析（使用量、收入、增长分析）
+- `settings.*` - 系统配置（全局配置、应用配置管理）
 
 **客户端 API 路由**（需要 App 认证）：
 - `user.*` - 用户注册与认证
@@ -214,6 +217,193 @@ src/services/ai/
 - `src/utils/jwt.ts` - JWT 令牌生成与验证
 - `src/utils/crypto.ts` - 加密工具（API 密钥生成等）
 - `src/utils/email.ts` - 邮件服务工具（可选）
+
+## API接口参考
+
+### 概述
+
+本系统采用 tRPC 作为 API 框架，所有端点通过 `/trpc/{路由}.{方法}` 访问。系统支持四级认证层级，每个端点需要相应的认证凭证。
+
+#### 认证头信息
+
+| 认证级别 | 请求头 | 示例值 | 适用路由 |
+|----------|--------|--------|----------|
+| **管理员认证** | `Authorization: Bearer <jwt-token>` | `Bearer eyJhbGciOiJIUzI1NiIs...` | `admin.*`, `app.*`, `subscriptionManage.*`, `userManage.*`, `analytics.*`, `settings.*` |
+| **App级别认证** | `x-api-key: <api-key>` | `x-api-key: app_1234567890abcdef` | `user.*`, `ai.*`, `style.*`, `subscription.*` |
+| **用户认证** | `x-api-key + x-device-id` 或 `Authorization: Bearer <jwt-token>` | `x-api-key: app_...` + `x-device-id: device_123` | `protectedProcedure` 端点 |
+| **公开访问** | 无 | 无 | `publicProcedure` 端点 |
+
+#### 错误处理
+
+所有 API 遵循统一的错误响应格式：
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "资源不存在",
+    "data": {
+      "resource": "user",
+      "id": "12345678-1234-1234-1234-123456789012"
+    }
+  }
+}
+```
+
+常见错误码：
+- `BAD_REQUEST` - 请求参数无效
+- `UNAUTHORIZED` - 认证失败
+- `FORBIDDEN` - 权限不足
+- `NOT_FOUND` - 资源不存在
+- `INTERNAL_SERVER_ERROR` - 服务器内部错误
+
+### 管理后台路由（管理员认证）
+
+#### 用户管理模块 (`userManage.*`)
+
+管理指定应用下的用户账户，支持列表查询、详情查看、状态管理操作。
+
+| 端点 | 类型 | 描述 | 输入参数 | 返回示例 |
+|------|------|------|----------|----------|
+| `userManage.list` | Query | 获取用户列表（分页、搜索、筛选） | `{ appId, search?, status?, emailVerified?, subscriptionTier?, sortBy, sortOrder, limit, offset }` | `{ items: [], total, limit, offset, hasMore }` |
+| `userManage.detail` | Query | 获取用户详情（含订阅历史、使用统计） | `{ userId }` | `{ user, app, activeSubscription, subscriptionHistory, usageStats, providerStats }` |
+| `userManage.disable` | Mutation | 禁用用户账户 | `{ userId, reason? }` | `{ user, message }` |
+| `userManage.enable` | Mutation | 启用用户账户 | `{ userId, reason? }` | `{ user, message }` |
+| `userManage.suspend` | Mutation | 暂停用户（临时限制） | `{ userId, reason, durationDays? }` | `{ user, message }` |
+| `userManage.resetPassword` | Mutation | 重置用户密码 | `{ userId, newPassword?, forceChange? }` | `{ success, message, generatedPassword? }` |
+| `userManage.verifyEmailManually` | Mutation | 手动验证用户邮箱 | `{ userId }` | `{ user, message }` |
+| `userManage.delete` | Mutation | 删除用户（软/硬删除） | `{ userId, hardDelete?, reason? }` | `{ success/user, message }` |
+
+#### 数据分析模块 (`analytics.*`)
+
+提供应用级别的数据分析和业务洞察。
+
+| 端点 | 类型 | 描述 | 输入参数 | 返回示例 |
+|------|------|------|----------|----------|
+| `analytics.usage` | Query | 使用量统计分析（时间趋势、分布、热门风格） | `{ appId, startDate, endDate, granularity?, groupByTier?, groupByProvider? }` | `{ timeSeries, summary, distribution }` |
+| `analytics.revenue` | Query | 收入与订阅分析（MRR、ARR、转化漏斗） | `{ appId, startDate, endDate, currency? }` | `{ mrr, arr, totalRevenue, subscriptionStats, conversionFunnel, planPerformance, revenueTrend }` |
+| `analytics.growth` | Query | 用户增长与留存分析（同期群分析） | `{ appId, periods?, periodType? }` | `{ userGrowth, retention, cohortAnalysis, activityLevels, summary }` |
+| `analytics.snapshot` | Query | 实时数据快照（仪表盘用） | `{ appId }` | `{ timestamp, metrics, health }` |
+
+#### 系统配置模块 (`settings.*`)
+
+管理系统全局配置和应用级别配置。
+
+| 端点 | 类型 | 描述 | 输入参数 | 返回示例 |
+|------|------|------|----------|----------|
+| `settings.global` | Query | 获取全局配置（邮件、AI、功能开关、安全、内容策略） | 无 | `{ settings, appId, appName, message }` |
+| `settings.updateGlobal` | Mutation | 更新全局配置 | `{ email?, aiDefaults?, features?, security?, contentPolicy? }` | `{ settings, message }` |
+| `settings.app` | Query | 获取应用配置 | `{ appId }` | `{ appId, appName, settings, platform, isActive, createdAt, updatedAt }` |
+| `settings.updateApp` | Mutation | 更新应用配置 | `{ appId, freeReplyLimitPerDay?, freeCandidateCount?, proCandidateCount?, enableAI?, enableSubscription?, aiProviders?, defaultAIProvider?, customFeatures? }` | `{ appId, appName, settings, message }` |
+| `settings.validateApp` | Query | 验证应用配置的完整性和有效性 | `{ appId }` | `{ appId, appName, isValid, issues, summary }` |
+| `settings.resetApp` | Mutation | 重置应用配置到默认值 | `{ appId, confirm }` | `{ appId, appName, settings, message }` |
+| `settings.listApps` | Query | 获取所有应用的配置摘要 | 无 | `[{ id, name, platform, isActive, configStatus, userCount, subscriptionCount, features }]` |
+
+#### 其他管理后台模块
+
+- **`admin.*`** - 管理员账户管理（登录、注销、信息查询）
+- **`app.*`** - 应用 CRUD 管理（创建、读取、更新、删除应用）
+- **`subscriptionManage.*`** - 订阅计划管理与用户订阅操作
+
+### 客户端 API 路由（App 认证）
+
+这些路由需要有效的 `x-api-key` 请求头，数据按 `appId` 自动隔离。
+
+#### 用户模块 (`user.*`)
+- `user.register` - 用户注册（设备ID、邮箱、密码）
+- `user.login` - 用户登录（设备ID+密码 或 邮箱+密码）
+- `user.me` - 获取当前用户信息（需用户认证）
+- `user.updateProfile` - 更新用户资料
+- `user.requestPasswordReset` - 请求密码重置邮件
+- `user.verifyEmail` - 验证邮箱地址
+
+#### AI 模块 (`ai.*`)
+- `ai.generateReply` - 生成 AI 回复（支持多种风格）
+- `ai.getUsage` - 获取当前使用量统计
+- `ai.getProviders` - 获取可用 AI 提供商列表
+
+#### 风格模块 (`style.*`)
+- `style.list` - 获取可用说话风格列表
+- `style.create` - 创建自定义风格（需 Pro 订阅）
+- `style.update` - 更新风格配置
+- `style.delete` - 删除风格
+
+#### 订阅模块 (`subscription.*`)
+- `subscription.plans` - 获取订阅计划列表
+- `subscription.status` - 获取当前订阅状态
+- `subscription.purchase` - 购买订阅（需要客户端支付集成）
+- `subscription.cancel` - 取消订阅（保留至到期日）
+- `subscription.restore` - 恢复已取消的订阅
+
+### 调用示例
+
+#### cURL 示例（管理后台）
+```bash
+# 获取用户列表
+curl -X POST http://localhost:3000/trpc/userManage.list \
+  -H "Authorization: Bearer <admin-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "12345678-1234-1234-1234-123456789012",
+    "limit": 10,
+    "offset": 0
+  }'
+
+# 获取数据分析
+curl -X POST http://localhost:3000/trpc/analytics.usage \
+  -H "Authorization: Bearer <admin-jwt-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "12345678-1234-1234-1234-123456789012",
+    "startDate": "2026-01-01",
+    "endDate": "2026-01-31"
+  }'
+```
+
+#### cURL 示例（客户端 API）
+```bash
+# 用户注册
+curl -X POST http://localhost:3000/trpc/user.register \
+  -H "x-api-key: <app-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceId": "device_123",
+    "email": "user@example.com",
+    "password": "secure_password"
+  }'
+
+# AI 回复生成
+curl -X POST http://localhost:3000/trpc/ai.generateReply \
+  -H "x-api-key: <app-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deviceId": "device_123",
+    "prompt": "你好，请帮我写一封感谢信",
+    "styleId": "friendly"
+  }'
+```
+
+### 类型安全客户端
+
+对于 TypeScript 项目，可以使用自动生成的类型安全客户端：
+
+```typescript
+import { createTRPCClient } from '@trpc/client';
+import type { AppRouter } from './server/trpc/router';
+
+const client = createTRPCClient<AppRouter>({
+  url: 'http://localhost:3000/trpc',
+  headers: {
+    'x-api-key': 'your-app-api-key'
+  }
+});
+
+// 类型安全的 API 调用
+const users = await client.userManage.list.query({
+  appId: '12345678-1234-1234-1234-123456789012',
+  limit: 10
+});
+```
 
 ## 开发指南
 

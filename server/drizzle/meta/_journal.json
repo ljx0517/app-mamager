@@ -15,6 +15,13 @@
       "when": 1770973924976,
       "tag": "0001_moaning_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771008075740,
+      "tag": "0002_colorful_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

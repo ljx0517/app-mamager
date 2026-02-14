@@ -2,6 +2,9 @@ import { router } from "./index.js";
 import { adminRouter } from "../routers/admin.js";
 import { appRouter as appManageRouter } from "../routers/app.js";
 import { subscriptionManageRouter } from "../routers/subscription-manage.js";
+import { userManageRouter } from "../routers/user-manage.js";
+import { analyticsRouter } from "../routers/analytics.js";
+import { settingsRouter } from "../routers/settings.js";
 import { userRouter } from "../routers/user.js";
 import { aiRouter } from "../routers/ai.js";
 import { styleRouter } from "../routers/style.js";
@@ -28,6 +31,9 @@ export const appRouter = router({
   admin: adminRouter,
   app: appManageRouter,
   subscriptionManage: subscriptionManageRouter,
+  userManage: userManageRouter,
+  analytics: analyticsRouter,
+  settings: settingsRouter,
 
   // 客户端 API（App 隔离）
   user: userRouter,
