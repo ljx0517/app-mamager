@@ -12,6 +12,8 @@ struct KeyboardMainView: View {
     @State private var isGenerating = false
     @State private var selectedStyleNames: [String] = []
     @State private var errorMessage: String?
+    @State private var showUpgradePrompt = false
+    @State private var usageInfo: (used: Int, remaining: Int, limit: Int, isPro: Bool) = (0, 10, 10, false)
     
     var body: some View {
         VStack(spacing: 0) {
@@ -184,27 +186,37 @@ struct KeyboardMainView: View {
     private func generateReply() {
         // 实时读取最新剪贴板内容，确保不会用到过期数据
         clipboardHelper.checkClipboard()
-        
+
         guard let message = clipboardHelper.clipboardText, !message.isBlank else {
             AppLogger.keyboard.warning("⚠️ [Keyboard] 剪贴板为空，无法生成回复")
             errorMessage = "剪贴板中没有文本内容"
             return
         }
-        
+
+        // 检查权限：每日使用限制
+        let usageCheck = DailyUsageManager.shared.canGenerateReply(subscriptionStatus: subscriptionStatus)
+        if !usageCheck.canGenerate {
+            usageInfo = DailyUsageManager.shared.getUsageInfo(subscriptionStatus: subscriptionStatus)
+            showUpgradePrompt = true
+            AppLogger.keyboard.warning("⛔ [Keyboard] 免费用户每日限制已达上限: \(usageInfo.used)/\(usageInfo.limit)")
+            return
+        }
+
         isGenerating = true
         errorMessage = nil
         replies = []
-        
+
         // 从 App Group 读取风格配置
         let stylePrompt = loadStylePrompt()
         let isPro = subscriptionStatus.isPro
         let candidateCount = isPro ? AppConstants.proCandidateCount : AppConstants.freeCandidateCount
-        
+
         AppLogger.keyboard.info("🚀 [Keyboard] 用户触发生成回复")
         AppLogger.keyboard.info("🚀 [Keyboard] 剪贴板消息（最新）: \(message.truncated(to: 50))")
         AppLogger.keyboard.info("🚀 [Keyboard] 选中风格: \(selectedStyleNames.joined(separator: " + "))")
         AppLogger.keyboard.info("🚀 [Keyboard] 订阅状态: \(isPro ? "Pro" : "免费"), 候选数: \(candidateCount)")
-        
+        AppLogger.keyboard.info("🚀 [Keyboard] 剩余次数: \(usageCheck.remainingCount)/\(usageCheck.limit)")
+
         Task {
             do {
                 let response = try await KeyboardAIService.generateReply(
@@ -213,12 +225,17 @@ struct KeyboardMainView: View {
                     candidateCount: candidateCount
                 )
                 await MainActor.run {
+                    // 记录使用次数
+                    DailyUsageManager.shared.recordReplyUsage(subscriptionStatus: subscriptionStatus)
+
                     replies = response.replies
                     isGenerating = false
                     AppLogger.keyboard.info("🎉 [Keyboard] 回复已展示，共 \(response.replies.count) 条")
                 }
             } catch {
                 await MainActor.run {
+                    // 仅在成功生成回复时才记录使用次数
+                    // 如果生成失败，不扣除免费用户的次数
                     errorMessage = error.localizedDescription
                     isGenerating = false
                     AppLogger.keyboard.error("💥 [Keyboard] 生成失败: \(error.localizedDescription)")
