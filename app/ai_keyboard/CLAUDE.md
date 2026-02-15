@@ -109,6 +109,40 @@ pnpm dev
 
 **重要**：开发时需确保后端服务正在运行，否则 AI 生成和订阅功能将不可用。生产版本使用配置的生产服务器 URL。
 
+### Memory 记忆系统
+
+项目集成了 Cursor Memory MCP 服务，用于记录开发过程中的重要上下文：
+
+```bash
+# 初始化项目 Memory（首次使用时自动调用）
+mcp__memory__initializeMemory -path <项目内任意文件路径>
+
+# 查看 Memory 状态看板
+mcp__memory__getMemoryStatusBoard
+
+# 检查 Memory 系统健康状态
+mcp__memory__checkHealth
+
+# 获取综合上下文（包含记忆、决策、里程碑等）
+mcp__memory__getComprehensiveContext
+```
+
+**自动记忆功能**：
+- 打开/编辑文件时自动记录到短期记忆
+- 重要里程碑自动保存到长期记忆
+- 记录关键设计决策和代码修改上下文
+
+**常用 Memory 工具**：
+| 工具 | 用途 |
+|------|------|
+| `mcp__memory__storeMilestone` | 记录里程碑 |
+| `mcp__memory__storeDecision` | 记录设计决策 |
+| `mcp__memory__storeRequirement` | 记录需求 |
+| `mcp__memory__recordEpisode` | 记录重要事件 |
+| `mcp__memory__getRecentEpisodes` | 获取最近的记忆 |
+
+---
+
 ## 架构概述
 
 ### 项目结构
