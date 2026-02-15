@@ -52,18 +52,20 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* 当前 App 业务页面 */}
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/users" element={<UsersPage />} />
-        <Route path="/subscriptions" element={<SubscriptionsPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        {/* 通用设置页面 */}
-        <Route path="/settings" element={<SettingsPage />} />
-        {/* 配置模板页面（动态 templateId） */}
-        <Route path="/settings/:templateId" element={<SettingsPage />} />
-
         {/* 全局管理页面 */}
         <Route path="/apps" element={<AppsPage />} />
+
+        {/* 某个 App 的业务页面 */}
+        <Route path="/:appId/dashboard" element={<DashboardPage />} />
+        <Route path="/:appId/users" element={<UsersPage />} />
+        <Route path="/:appId/subscriptions" element={<SubscriptionsPage />} />
+        <Route path="/:appId/analytics" element={<AnalyticsPage />} />
+        <Route path="/:appId/settings" element={<SettingsPage />} />
+        {/* 配置模板页面 */}
+        <Route path="/:appId/settings/:templateId" element={<SettingsPage />} />
+
+        {/* 首页：提示用户选择 App */}
+        <Route path="/" element={<Navigate to="/apps" replace />} />
       </Route>
 
       {/* 404 回退 */}
