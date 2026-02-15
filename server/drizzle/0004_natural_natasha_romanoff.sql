@@ -1,0 +1,1 @@
+ALTER TABLE "apps" ADD COLUMN "config_template" varchar(100);

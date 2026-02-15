@@ -83,6 +83,12 @@ export const apps = pgTable("apps", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   bundleId: varchar("bundle_id", { length: 255 }).notNull(),
+  /** App 配置名称，关联 app_settings 目录下的配置 */
+  configName: varchar("config_name", { length: 100 }).default("common").notNull(),
+  /** App 配置模板，用于快速创建或复制配置 */
+  configTemplate: varchar("config_template", { length: 100 }),
+  /** App 友好的 slug 标识符，用于 URL */
+  slug: varchar("slug", { length: 100 }).unique(),
   platform: platformEnum("platform").default("ios").notNull(),
   apiKey: varchar("api_key", { length: 64 }).notNull().unique(),
   apiSecret: varchar("api_secret", { length: 128 }).notNull(),

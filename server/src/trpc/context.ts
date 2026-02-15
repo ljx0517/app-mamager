@@ -1,7 +1,8 @@
 import { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
 import { eq } from "drizzle-orm";
-import { db } from "../db/index.js";
-import { apps, type App } from "../db/schema.js";
+import { db } from "@/db";
+import { apps, type App } from "@/db/schema";
+import { getConfigModule, type AppModuleConfig } from "@/app_settings/registry";
 
 /**
  * tRPC 请求上下文（多租户版）
@@ -10,6 +11,10 @@ import { apps, type App } from "../db/schema.js";
  *  - 客户端 App 通过 x-api-key 请求头标识自己属于哪个 App
  *  - 客户端 App 通过 x-device-id 请求头标识用户设备
  *  - 管理后台通过 Authorization: Bearer <token> 进行管理员认证
+ *
+ * App 配置模型：
+ *  - 每个 App 有一个 configName 字段，关联 app_settings 目录下的配置
+ *  - 不同 App 可以使用相同的配置（配置复用）
  */
 export async function createContext({ req, res }: CreateFastifyContextOptions) {
   const apiKey = req.headers["x-api-key"] as string | undefined;
@@ -27,6 +32,28 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
     app = found ?? null;
   }
 
+  // 获取 App 专属配置和服务
+  // 使用 configName（默认为 "common"）来查找配置模块
+  const configName = app?.configName || "common";
+  let appConfig: AppModuleConfig = {
+    features: {},
+    limits: {},
+  };
+  let appServices: Record<string, unknown> = {};
+
+  if (configName && configName !== "common") {
+    const configModule = getConfigModule(configName);
+    if (configModule) {
+      appConfig = configModule.config;
+      // 加载 App 专属服务
+      if (configModule.services) {
+        for (const service of configModule.services) {
+          appServices[service.name] = service.instance;
+        }
+      }
+    }
+  }
+
   return {
     req,
     res,
@@ -37,6 +64,12 @@ export async function createContext({ req, res }: CreateFastifyContextOptions) {
     deviceId,
     /** 管理员 Authorization header */
     authorization,
+    /** App 专属配置 */
+    appConfig,
+    /** App 专属服务 */
+    appServices,
+    /** 当前使用的配置名称 */
+    configName,
   };
 }
 

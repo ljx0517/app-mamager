@@ -9,6 +9,11 @@ import { appRouter, type AppRouter } from "./trpc/router.js";
 import { checkEmailConfig } from "./utils/email.js";
 import { registerRestAdapter } from "./routers/rest-adapter.js";
 
+// 导入并注册 App 配置模块
+import "./app_settings/common/index.js";
+import "./app_settings/ai-keyboard-pro/index.js";
+import { getRegisteredConfigNames } from "./app_settings/registry.js";
+
 /**
  * 多 App 管理后台服务
  * 基于 Fastify + tRPC + Drizzle ORM + PostgreSQL
@@ -83,6 +88,13 @@ async function main() {
 
   try {
     await server.listen({ port, host });
+
+    // 获取已注册的配置列表
+    const registeredConfigs = getRegisteredConfigNames();
+    const configListStr = registeredConfigs.length > 0
+      ? `\n║  App配置:  ${registeredConfigs.join(", ")}`
+      : "";
+
     console.log(`
 ╔═══════════════════════════════════════════════════╗
 ║        Multi-App Management Server                ║
@@ -94,7 +106,7 @@ async function main() {
 ╠═══════════════════════════════════════════════════╣
 ║  管理后台:  admin.* / app.*                        ║
 ║  客户端:    user.* / ai.* / style.* / subscription.*║
-║  REST适配: /api/user/* /api/ai/* /api/subscription/*║
+║  REST适配: /api/user/* /api/ai/* /api/subscription/*${configListStr}
 ╚═══════════════════════════════════════════════════╝
     `);
   } catch (err) {

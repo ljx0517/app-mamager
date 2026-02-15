@@ -1,0 +1,1 @@
+ALTER TABLE "apps" ADD COLUMN "config_name" varchar(100) DEFAULT 'common' NOT NULL;

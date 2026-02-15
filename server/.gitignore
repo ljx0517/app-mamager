@@ -26,7 +26,8 @@ app/AIKeyboard.app.dSYM.zip.part.10
 admin/node_modules
 admin/dist
 admin/.vite
-
+.claude
+.claude/**/*
 node_modules
 dist
 logs
