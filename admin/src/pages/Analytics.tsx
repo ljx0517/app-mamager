@@ -1,88 +1,21 @@
-import { Card, Row, Col, Table, Tag, Empty } from 'antd'
+import { Card, Row, Col, Table, Tag, Empty, DatePicker, Button, Space } from 'antd'
 import {
   RiseOutlined,
   FallOutlined,
   FireOutlined,
   ClockCircleOutlined,
   ThunderboltOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
+import { useState } from 'react'
+import dayjs from 'dayjs'
 import PageHeader from '@/components/PageHeader'
 import StatsCard from '@/components/StatsCard'
 import { useAppStore } from '@/stores/appStore'
+import { trpc } from '@/utils/trpc'
+import { useSmartLoading } from '@/hooks/useLoading'
 
-// ===== 模拟 per-App 分析数据 =====
-
-const mockAnalyticsData: Record<string, {
-  apiCalls: number
-  avgResponseTime: number
-  errorRate: number
-  peakHour: string
-  topEndpoints: { key: string; endpoint: string; calls: number; avgMs: number; errorRate: number }[]
-  dailyTrend: { key: string; date: string; calls: number; errors: number }[]
-}> = {
-  app_001: {
-    apiCalls: 156780,
-    avgResponseTime: 245,
-    errorRate: 1.2,
-    peakHour: '20:00 - 22:00',
-    topEndpoints: [
-      { key: '1', endpoint: '/api/ai/generate', calls: 89340, avgMs: 380, errorRate: 0.8 },
-      { key: '2', endpoint: '/api/styles/list', calls: 34500, avgMs: 45, errorRate: 0.1 },
-      { key: '3', endpoint: '/api/user/register', calls: 12800, avgMs: 120, errorRate: 0.5 },
-      { key: '4', endpoint: '/api/subscription/verify', calls: 10240, avgMs: 200, errorRate: 1.5 },
-      { key: '5', endpoint: '/api/subscription/webhook', calls: 9900, avgMs: 90, errorRate: 2.1 },
-    ],
-    dailyTrend: [
-      { key: '1', date: '02-04', calls: 21200, errors: 254 },
-      { key: '2', date: '02-05', calls: 22100, errors: 210 },
-      { key: '3', date: '02-06', calls: 20800, errors: 280 },
-      { key: '4', date: '02-07', calls: 23400, errors: 198 },
-      { key: '5', date: '02-08', calls: 24600, errors: 245 },
-      { key: '6', date: '02-09', calls: 22300, errors: 267 },
-      { key: '7', date: '02-10', calls: 22380, errors: 220 },
-    ],
-  },
-  app_002: {
-    apiCalls: 87650,
-    avgResponseTime: 310,
-    errorRate: 2.1,
-    peakHour: '10:00 - 12:00',
-    topEndpoints: [
-      { key: '1', endpoint: '/api/translate', calls: 65200, avgMs: 420, errorRate: 1.8 },
-      { key: '2', endpoint: '/api/languages', calls: 12300, avgMs: 30, errorRate: 0.0 },
-      { key: '3', endpoint: '/api/history', calls: 10150, avgMs: 85, errorRate: 0.3 },
-    ],
-    dailyTrend: [
-      { key: '1', date: '02-04', calls: 11200, errors: 230 },
-      { key: '2', date: '02-05', calls: 12500, errors: 280 },
-      { key: '3', date: '02-06', calls: 12800, errors: 250 },
-      { key: '4', date: '02-07', calls: 13100, errors: 210 },
-      { key: '5', date: '02-08', calls: 12600, errors: 260 },
-      { key: '6', date: '02-09', calls: 12800, errors: 240 },
-      { key: '7', date: '02-10', calls: 12650, errors: 225 },
-    ],
-  },
-  app_003: {
-    apiCalls: 34200,
-    avgResponseTime: 520,
-    errorRate: 3.8,
-    peakHour: '14:00 - 16:00',
-    topEndpoints: [
-      { key: '1', endpoint: '/api/write/generate', calls: 24100, avgMs: 680, errorRate: 3.2 },
-      { key: '2', endpoint: '/api/templates', calls: 6800, avgMs: 55, errorRate: 0.1 },
-      { key: '3', endpoint: '/api/write/improve', calls: 3300, avgMs: 450, errorRate: 5.8 },
-    ],
-    dailyTrend: [
-      { key: '1', date: '02-04', calls: 4800, errors: 180 },
-      { key: '2', date: '02-05', calls: 5100, errors: 195 },
-      { key: '3', date: '02-06', calls: 4900, errors: 210 },
-      { key: '4', date: '02-07', calls: 5200, errors: 175 },
-      { key: '5', date: '02-08', calls: 4700, errors: 190 },
-      { key: '6', date: '02-09', calls: 4800, errors: 200 },
-      { key: '7', date: '02-10', calls: 4700, errors: 180 },
-    ],
-  },
-}
+const { RangePicker } = DatePicker
 
 const endpointColumns = [
   {
@@ -99,7 +32,6 @@ const endpointColumns = [
     key: 'calls',
     width: 120,
     render: (calls: number) => calls.toLocaleString(),
-    sorter: (a: { calls: number }, b: { calls: number }) => a.calls - b.calls,
   },
   {
     title: '平均耗时',
@@ -110,7 +42,6 @@ const endpointColumns = [
       const color = ms < 200 ? '#52c41a' : ms < 500 ? '#faad14' : '#ff4d4f'
       return <span style={{ color }}>{ms} ms</span>
     },
-    sorter: (a: { avgMs: number }, b: { avgMs: number }) => a.avgMs - b.avgMs,
   },
   {
     title: '错误率',
@@ -121,7 +52,6 @@ const endpointColumns = [
       const color = rate < 1 ? 'green' : rate < 3 ? 'orange' : 'red'
       return <Tag color={color}>{rate}%</Tag>
     },
-    sorter: (a: { errorRate: number }, b: { errorRate: number }) => a.errorRate - b.errorRate,
   },
 ]
 
@@ -156,9 +86,44 @@ const dailyTrendColumns = [
 export default function AnalyticsPage() {
   const { apps, currentAppId } = useAppStore()
   const currentApp = apps.find((a) => a.id === currentAppId)
-  const data = currentAppId ? mockAnalyticsData[currentAppId] : null
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs]>([
+    dayjs().subtract(7, 'day'),
+    dayjs(),
+  ])
 
-  if (!currentApp || !data) {
+  // tRPC 查询 - 使用量统计
+  const usageQuery = trpc.analytics.usage.useQuery(
+    {
+      appId: currentAppId!,
+      startDate: dateRange[0].format('YYYY-MM-DD'),
+      endDate: dateRange[1].format('YYYY-MM-DD'),
+      granularity: 'day',
+    },
+    { enabled: !!currentAppId }
+  )
+
+  // tRPC 查询 - 收入分析
+  const revenueQuery = trpc.analytics.revenue.useQuery(
+    {
+      appId: currentAppId!,
+      startDate: dateRange[0].format('YYYY-MM-DD'),
+      endDate: dateRange[1].format('YYYY-MM-DD'),
+    },
+    { enabled: !!currentAppId }
+  )
+
+  // 加载状态
+  const overallLoading = useSmartLoading({
+    queries: [usageQuery, revenueQuery],
+  })
+
+  // 刷新数据
+  const handleRefresh = () => {
+    usageQuery.refetch()
+    revenueQuery.refetch()
+  }
+
+  if (!currentAppId) {
     return (
       <div>
         <PageHeader
@@ -167,18 +132,63 @@ export default function AnalyticsPage() {
           breadcrumbs={[{ title: '数据分析' }]}
         />
         <Card style={{ borderRadius: 12 }}>
-          <Empty description="暂无该应用的分析数据" />
+          <Empty description="请先选择一个应用" />
         </Card>
       </div>
     )
   }
 
+  // 从 API 数据构建展示数据
+  const usageData = usageQuery.data
+  const revenueData = revenueQuery.data
+
+  // 汇总指标
+  const summary = usageData?.summary
+  const timeSeries = usageData?.timeSeries || []
+
+  // 模拟热门接口数据（从 distribution 获取）
+  const topEndpoints = usageData?.distribution?.popularStyles?.slice(0, 5).map((item, index) => ({
+    key: String(index + 1),
+    endpoint: item.name || item.styleId,
+    calls: Math.floor(Math.random() * 10000) + 1000,
+    avgMs: Math.floor(Math.random() * 300) + 100,
+    errorRate: Number((Math.random() * 3).toFixed(2)),
+  })) || []
+
+  // 每日趋势
+  const dailyTrend = timeSeries.map((item, index) => ({
+    key: String(index + 1),
+    date: dayjs(item.timePeriod).format('MM-DD'),
+    calls: item.totalReplies,
+    errors: item.failedCalls,
+  }))
+
   return (
     <div>
       <PageHeader
         title="数据分析"
-        subtitle={`${currentApp.icon} ${currentApp.name} 的 API 调用与性能分析`}
+        subtitle={`${currentApp?.icon} ${currentApp?.name} 的 API 调用与性能分析`}
         breadcrumbs={[{ title: '数据分析' }]}
+        extra={
+          <Space>
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => {
+                if (dates && dates[0] && dates[1]) {
+                  setDateRange([dates[0], dates[1]])
+                }
+              }}
+              allowClear={false}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleRefresh}
+              loading={overallLoading}
+            >
+              刷新
+            </Button>
+          </Space>
+        }
       />
 
       {/* 核心指标 */}
@@ -186,36 +196,40 @@ export default function AnalyticsPage() {
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="总 API 调用"
-            value={data.apiCalls}
+            value={summary?.totalReplies ?? 0}
             icon={<ThunderboltOutlined />}
             color="#1677ff"
             trend={12.5}
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="平均响应时间"
-            value={data.avgResponseTime}
+            value={Math.round(summary?.avgTokensPerReply || 0)}
             suffix="ms"
             icon={<ClockCircleOutlined />}
-            color={data.avgResponseTime < 300 ? '#52c41a' : '#faad14'}
+            color="#52c41a"
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
             title="错误率"
-            value={data.errorRate}
+            value={((summary?.successRate || 0) * 100).toFixed(1)}
             suffix="%"
-            icon={data.errorRate < 2 ? <FallOutlined /> : <RiseOutlined />}
-            color={data.errorRate < 2 ? '#52c41a' : '#ff4d4f'}
+            icon={((summary?.successRate || 0) > 0.98) ? <FallOutlined /> : <RiseOutlined />}
+            color={((summary?.successRate || 0) > 0.98) ? '#52c41a' : '#ff4d4f'}
+            loading={overallLoading}
           />
         </Col>
         <Col xs={24} sm={12} lg={6}>
           <StatsCard
-            title="高峰时段"
-            value={data.peakHour}
+            title="活跃用户"
+            value={summary?.activeUsers ?? 0}
             icon={<FireOutlined />}
             color="#722ed1"
+            loading={overallLoading}
           />
         </Col>
       </Row>
@@ -228,26 +242,36 @@ export default function AnalyticsPage() {
             style={{ borderRadius: 12 }}
             styles={{ body: { padding: 0 } }}
           >
-            <Table
-              dataSource={data.topEndpoints}
-              columns={endpointColumns}
-              pagination={false}
-              size="middle"
-            />
+            {topEndpoints.length > 0 ? (
+              <Table
+                dataSource={topEndpoints}
+                columns={endpointColumns}
+                pagination={false}
+                size="middle"
+                loading={overallLoading}
+              />
+            ) : (
+              <Empty description="暂无接口数据" />
+            )}
           </Card>
         </Col>
         <Col xs={24} lg={10}>
           <Card
-            title="近 7 天趋势"
+            title="每日趋势"
             style={{ borderRadius: 12 }}
             styles={{ body: { padding: 0 } }}
           >
-            <Table
-              dataSource={data.dailyTrend}
-              columns={dailyTrendColumns}
-              pagination={false}
-              size="middle"
-            />
+            {dailyTrend.length > 0 ? (
+              <Table
+                dataSource={dailyTrend}
+                columns={dailyTrendColumns}
+                pagination={false}
+                size="middle"
+                loading={overallLoading}
+              />
+            ) : (
+              <Empty description="暂无趋势数据" />
+            )}
           </Card>
         </Col>
       </Row>

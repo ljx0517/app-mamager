@@ -28,6 +28,8 @@ export interface AppInfo {
   bundleId?: string
   /** App 状态 */
   status: AppStatus
+  /** 配置模板 ID（对应 pages/Settings/configs/{templateId}） */
+  configTemplate?: string
   /** 创建时间 */
   createdAt: string
   /** 更新时间 */

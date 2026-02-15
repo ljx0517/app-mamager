@@ -46,7 +46,7 @@ export default function StatsCard({
             prefix={prefix}
             suffix={suffix}
             precision={precision}
-            valueStyle={{ fontWeight: 600, fontSize: 28 }}
+            styles={{ content: { fontWeight: 600, fontSize: 28 } }}
           />
 
           {trend !== undefined && (

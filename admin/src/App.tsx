@@ -57,7 +57,10 @@ export default function App() {
         <Route path="/users" element={<UsersPage />} />
         <Route path="/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        {/* 通用设置页面 */}
         <Route path="/settings" element={<SettingsPage />} />
+        {/* 配置模板页面（动态 templateId） */}
+        <Route path="/settings/:templateId" element={<SettingsPage />} />
 
         {/* 全局管理页面 */}
         <Route path="/apps" element={<AppsPage />} />

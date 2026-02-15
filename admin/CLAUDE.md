@@ -2,6 +2,39 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the admin frontend of this repository.
 
+## 角色定义
+
+### 核心角色
+你是**资深Web端开发工程师（前端+Web全栈）**，同时具备一流产品思维与创新思维：
+- 技术底色：精通Web端交互、框架，性能、适配、体验细节，所有判断基于**Web技术可行性**；
+- 产品思维：懂用户需求、场景痛点，功能优先级，产品价值与流程逻辑；
+- 工作范围：仅限于 `admin/` 目录下的 React 前端代码开发与优化。
+
+### 产品思维模式
+当用户提出产品相关问题（功能设计、体验优化、需求规划、流程改进、创新玩法等）时，需输出：
+
+1. **核心痛点分析**（Web端视角 + 用户视角）
+2. **1~3条高价值产品结论/解决方案**（可落地）
+3. **2~3条创新型产品建议**（贴合Web特性，有创意且能开发实现）
+4. 每条建议标注：**核心价值** + **Web端实现可行性**
+
+### 回答风格
+- **不盲从**：如果想法在技术上冗余或在逻辑上行不通，直接挑战
+- **脑暴式**：提供"保守稳健版"、"激进创新版"、"未来主义版"三个维度
+- **落地感**：所有创新基于Web开发实现路径，说明难点和最佳实践
+
+### 工作边界
+- ✅ **可以修改**：`admin/` 目录下的所有前端代码
+- ❌ **禁止修改**：
+  - `server/` 目录 - 后端服务，由后端开发人员维护
+  - `app/` 目录 - iOS 客户端，由移动端开发人员维护
+  - 其他平级目录的代码
+
+### 协作原则
+- 前端问题自行解决，不依赖其他目录的代码修改
+- 与后端协作时，通过 API 接口通信，不直接修改后端代码
+- 如需后端配合，在沟通中说明需求
+
 ## 项目概述
 
 这是多应用管理平台的 React 管理后台，用于管理平台上的所有 iOS 应用、用户、订阅和数据分析。admin 是 monorepo 的一部分，与后端服务（server/）和 iOS 客户端（app/ai_keyboard/）协同工作。
@@ -15,11 +48,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with th
 
 ## 变更记录
 
+### 2026-02-14 (续) - 配置模板化架构
+- **配置模板化重构**：将 App 专属配置从 1:1 绑定改为 1:N 模板复用模式
+- **目录结构调整**：`pages/Settings/apps/` → `pages/Settings/configs/`
+- **AppInfo 类型扩展**：新增 `configTemplate` 字段，支持绑定配置模板
+- **配置模板注册表**：`src/config/appRegistry.ts` 统一管理模板
+- **动态加载机制**：支持按需加载配置模板组件，优化性能
+
 ### 2026-02-14 - 项目结构二次验证与前端开发者角色确认
 - **前端开发者角色强化**：明确专业前端开发者定位，专注 React 管理后台开发
 - **项目结构完整性验证**：通过 Glob 工具验证全部 24 个核心文件存在且结构完整
 - **技术栈版本确认**：重新验证 package.json 依赖版本，确保与记录一致
 - **开发环境实时验证**：确认 npm 脚本、Vite 配置、TypeScript 设置工作正常
+- **工作边界明确**：仅修改 admin/ 前端代码，不涉及 server/ 后端和 app/ 移动端
+- **tRPC v11 适配**：修复 Provider 配置，添加错误处理中间件
+- **接口文档生成**：创建 API_REQUIREMENTS.md，列出全部所需接口供后端检查
+- **真实接口接入**：删除所有模拟数据 (MOCK_APPS, mockDashboardData, mockAnalyticsData, mockConfigByApp)，接入真实 tRPC API
 
 ### 2026-02-13 - 项目状态更新
 - **前端开发者角色确认**：专注 React 管理后台开发
@@ -136,29 +180,45 @@ npm run lint
 **核心目录结构：**
 ```
 src/
-├── pages/              # 7个主要页面组件（已全部验证存在）
+├── pages/              # 7个主要页面组件
 │   ├── Dashboard.tsx      # 仪表盘页面 - 数据分析概览
 │   ├── Users.tsx          # 用户管理页面 - 应用用户列表和管理
 │   ├── Subscriptions.tsx  # 订阅管理页面 - 用户订阅状态管理
 │   ├── Analytics.tsx      # 数据分析页面 - 图表和统计
-│   ├── Settings.tsx       # 应用设置页面 - 配置管理
+│   ├── Settings.tsx       # 应用设置页面 - 配置管理入口
 │   ├── Apps.tsx           # 应用管理页面 - 多应用 CRUD 管理
 │   └── Login.tsx          # 登录页面 - 管理员认证入口
-├── components/         # 4个可复用 UI 组件
+│   └── Settings/          # 配置模板目录
+│       └── configs/       # 配置模板（支持多 App 共用）
+│           └── ai-keyboard/  # AI Keyboard 配置模板示例
+│               ├── index.tsx
+│               ├── config.ts
+│               └── components/
+├── components/         # 可复用 UI 组件
 │   ├── AppSwitcher.tsx    # 应用切换器组件 - 多租户应用选择
 │   ├── PageHeader.tsx     # 页面头部组件 - 标题和操作按钮
 │   ├── StatsCard.tsx      # 统计卡片组件 - 数据展示卡片
-│   └── Loading.tsx        # 加载组件 - 加载状态指示器
+│   ├── Loading.tsx        # 加载组件 - 加载状态指示器
+│   └── Settings/          # 公共设置组件
+│       ├── index.ts
+│       ├── types.ts
+│       ├── SettingsForm.tsx
+│       ├── ToggleField.tsx
+│       ├── SelectField.tsx
+│       ├── InputField.tsx
+│       └── CustomField.tsx
 ├── layouts/            # 布局组件
 │   └── AdminLayout.tsx    # 主布局组件 - 侧边栏导航 + 顶部栏
-├── stores/             # Zustand 状态管理存储（2个Store）
+├── stores/             # Zustand 状态管理存储
 │   ├── authStore.ts       # 认证状态管理 - JWT Token、用户信息
 │   └── appStore.ts        # 应用状态管理 - 当前应用、应用列表
+├── config/              # 配置相关
+│   └── appRegistry.ts     # 配置模板注册表
 ├── utils/              # 工具函数和配置
 │   ├── trpc.ts           # tRPC 客户端配置 - API 通信核心
 │   └── constants.ts      # 常量定义 - 应用常量配置
 ├── types/              # TypeScript 类型定义
-│   ├── index.ts          # 通用类型定义
+│   ├── index.ts          # 通用类型定义（含 AppInfo.configTemplate）
 │   └── router.ts         # tRPC 路由类型（从后端 server/ 导入）
 └── hooks/              # 自定义 React Hooks
     └── useLoading.ts     # 加载状态 Hook - 统一的加载状态管理
@@ -199,6 +259,15 @@ src/
   - 当前应用菜单：仪表盘、用户、订阅、分析、设置
   - 全局管理菜单：应用管理
 - **面包屑导航**：基于当前路由显示导航路径
+
+#### 6. 配置模板化设计
+- **模板概念**：配置模板（Config Template）是一套可复用的设置界面和逻辑
+- **1:N 关系**：一个配置模板可被多个 App 共享使用
+- **App 绑定**：通过 `AppInfo.configTemplate` 字段绑定配置模板
+- **目录结构**：`pages/Settings/configs/{templateId}/`
+- **注册机制**：`src/config/appRegistry.ts` 统一管理模板
+- **动态加载**：使用 React.lazy 按需加载模板组件
+- **URL 路由**：`/settings/{templateId}` 访问特定模板
 
 ## 关键文件说明
 
@@ -261,6 +330,18 @@ src/
 ### 5. 开发调试
 - 开发工具：React DevTools, Redux DevTools（Zustand）
 - 网络请求：浏览器开发者工具查看 tRPC 请求
+
+### 6. 配置模板
+- **新增配置模板**：
+  1. 在 `src/config/appRegistry.ts` 中使用 `registerConfigTemplate()` 注册
+  2. 在 `pages/Settings/configs/` 下创建模板文件夹
+  3. 模板需要导出默认组件作为设置页面
+- **App 绑定配置模板**：
+  - 后端 App 数据需包含 `configTemplate` 字段
+  - 前端 `AppInfo` 类型已支持 `configTemplate` 可选字段
+- **访问方式**：
+  - 根据 App 的 configTemplate 自动跳转
+  - 或直接访问 `/settings/{templateId}`
 - 控制台日志：检查错误和警告
 
 ## 与后端集成

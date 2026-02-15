@@ -35,6 +35,7 @@ import {
 } from '@/utils/constants'
 import { trpc } from '@/utils/trpc'
 import { useSmartLoading } from '@/hooks/useLoading'
+import { getRegisteredTemplates } from '@/config/appRegistry'
 
 const { TextArea } = Input
 
@@ -42,12 +43,14 @@ const { TextArea } = Input
 interface BackendApp {
   id: string
   name: string
+  slug?: string
   bundleId: string
   platform: 'ios' | 'android' | 'web'
   description?: string | null
   isActive: boolean
   apiKey: string
   apiSecret: string
+  configTemplate?: string
   settings?: Record<string, any>
   createdAt: Date | string
   updatedAt: Date | string
@@ -61,14 +64,17 @@ function backendAppToFrontend(backendApp: BackendApp): AppInfo {
   // 将isActive转换为status
   const status = backendApp.isActive ? 'active' : 'inactive'
 
-  // 生成slug：将name转换为小写，用连字符替换空格和非字母数字字符
-  const slug = backendApp.name
+  // 获取slug：优先从API读取，否则从name生成
+  const slug = backendApp.slug || backendApp.name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
 
   // 使用平台首字母作为图标，或从设置中读取
   const icon = getIconFromPlatform(backendApp.platform)
+
+  // 获取配置模板（从顶层字段读取，兼容 settings 中的配置）
+  const configTemplate = (backendApp as any).configTemplate || (backendApp as any).settings?.configTemplate
 
   return {
     id: backendApp.id,
@@ -79,6 +85,7 @@ function backendAppToFrontend(backendApp: BackendApp): AppInfo {
     platform: backendApp.platform,
     bundleId: backendApp.bundleId,
     status,
+    configTemplate,
     createdAt: typeof backendApp.createdAt === 'string'
       ? backendApp.createdAt
       : backendApp.createdAt.toISOString(),
@@ -109,6 +116,7 @@ function frontendAppToBackendCreate(appInfo: Partial<AppInfo>) {
     bundleId: appInfo.bundleId || '',
     platform: (appInfo.platform as 'ios' | 'android' | 'web') || 'ios',
     description: appInfo.description,
+    configTemplate: appInfo.configTemplate,
     // 创建时由后端自动生成apiKey/apiSecret
   }
 }
@@ -200,17 +208,23 @@ export default function AppsPage() {
 
       if (editingApp) {
         // 更新现有应用
-        const updateData = {
+        const updateData: any = {
           id: editingApp.id,
           name: values.name,
+          slug: values.slug,
           description: values.description,
           isActive: values.status === 'active',
         }
 
+        // 添加配置模板（如果选择了模板）
+        if (values.configTemplate) {
+          updateData.configTemplate = values.configTemplate
+        }
+
         updateAppMutation.mutate(updateData, {
-          onSuccess: (data) => {
+          onSuccess: async (data) => {
             message.success(data.message || '应用已更新')
-            appsQuery.refetch() // 刷新列表
+            await appsQuery.refetch() // 等待刷新完成
             setModalOpen(false)
           },
           onError: (error) => {
@@ -219,17 +233,24 @@ export default function AppsPage() {
         })
       } else {
         // 创建新应用
-        const createData = {
+        const createData: any = {
           name: values.name,
+          slug: values.slug,
           bundleId: values.bundleId || `${values.slug}.app`,
           platform,
           description: values.description,
+          icon: values.icon || '📱', // 默认图标
+        }
+
+        // 添加配置模板（如果选择了模板）
+        if (values.configTemplate) {
+          createData.configTemplate = values.configTemplate
         }
 
         createAppMutation.mutate(createData, {
-          onSuccess: (data) => {
+          onSuccess: async (data) => {
             message.success(data.message || '应用已创建')
-            appsQuery.refetch() // 刷新列表
+            await appsQuery.refetch() // 等待刷新完成
             setModalOpen(false)
           },
           onError: (error) => {
@@ -325,6 +346,23 @@ export default function AppsPage() {
           {APP_STATUS_LABELS[status]}
         </Tag>
       ),
+    },
+    {
+      title: '配置模板',
+      dataIndex: 'configTemplate',
+      key: 'configTemplate',
+      width: 120,
+      render: (configTemplate?: string) => {
+        if (!configTemplate) {
+          return <span style={{ color: token.colorTextQuaternary }}>-</span>
+        }
+        const template = getRegisteredTemplates().find(t => t.id === configTemplate)
+        return template ? (
+          <Tag color="blue">{template.icon} {template.displayName}</Tag>
+        ) : (
+          <Tag>{configTemplate}</Tag>
+        )
+      },
     },
     {
       title: '更新时间',
@@ -474,7 +512,6 @@ export default function AppsPage() {
               <Form.Item
                 name="icon"
                 label="图标 (Emoji)"
-                rules={[{ required: true, message: '请输入图标' }]}
               >
                 <Input placeholder="⌨️" maxLength={4} />
               </Form.Item>
@@ -533,6 +570,28 @@ export default function AppsPage() {
 
           <Form.Item name="bundleId" label="Bundle ID / Package Name">
             <Input placeholder="com.example.myapp" maxLength={100} />
+          </Form.Item>
+
+          <Form.Item
+            name="configTemplate"
+            label="配置模板"
+            tooltip="选择该应用使用的设置界面模板，多个应用可以使用同一模板"
+          >
+            <Select
+              placeholder="选择配置模板（可选）"
+              allowClear
+              options={[
+                ...getRegisteredTemplates().map((t) => ({
+                  label: `${t.icon} ${t.displayName}`,
+                  value: t.id,
+                })),
+                {
+                  label: '无模板',
+                  value: '',
+                  disabled: false,
+                },
+              ]}
+            />
           </Form.Item>
         </Form>
       </Modal>

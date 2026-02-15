@@ -27,7 +27,7 @@ export const queryClient = new QueryClient({
  * 从 tRPC 错误中提取用户友好的错误信息
  */
 function getErrorMessage(error: unknown): string {
-  const err = error as any
+  const err = error as { data?: { code?: string; message?: string }; message?: string }
 
   // tRPC 错误结构
   if (err?.data?.code === 'UNAUTHORIZED') {
@@ -64,17 +64,18 @@ function getErrorMessage(error: unknown): string {
  */
 export const trpcClient = trpc.createClient({
   links: [
-    // 调试日志
+    // 日志链路 - 记录所有请求
     loggerLink({
-      enabled: (opts) => {
-        // 只在错误时显示日志
-        return opts.direction === 'down' && opts.result instanceof Error
+      console: {
+        log: (args) => console.log('[tRPC]', ...args),
+        error: (args) => console.error('[tRPC Error]', ...args),
       },
     }),
     httpBatchLink({
       url: '/api/trpc',
       headers() {
         const token = localStorage.getItem('admin_token')
+        console.log('[trpc headers] token:', token ? '存在' : '不存在')
 
         // 从 Zustand 持久化存储中读取当前 App ID
         let appId: string | null = null
@@ -93,35 +94,36 @@ export const trpcClient = trpc.createClient({
           ...(appId ? { 'x-app-id': appId } : {}),
         }
       },
-      // 全局错误处理 - 通过 fetch 包装
-      async fetch(url, options) {
-        try {
-          const response = await fetch(url, options)
-
-          // 如果响应状态不是 2xx，抛出错误
-          if (!response.ok) {
-            let errorMsg = `请求失败 (${response.status})`
-
-            try {
-              const errorData = await response.json()
-              errorMsg = getErrorMessage(errorData)
-            } catch {
-              // 不是 JSON 响应，使用默认消息
-            }
-
-            message.error(errorMsg)
-          }
-
-          return response
-        } catch (error) {
-          // 网络错误
-          message.error(getErrorMessage(error))
-          throw error
-        }
-      },
     }),
   ],
 })
 
-// 导出错误处理函数，供各页面使用
-export { getErrorMessage }
+/**
+ * 全局错误处理配置
+ * 使用 mutation 的 onError 回调处理错误
+ * 此函数可在需要全局错误处理的地方调用
+ */
+export function setupGlobalErrorHandler() {
+  // 设置全局 mutation 错误处理
+  // 通过覆盖 queryClient 的默认错误处理来实现
+  const originalHandleQueryResult = queryClient.getDefaultOptions().queries?.onError
+
+  queryClient.setDefaultOptions({
+    ...queryClient.getDefaultOptions(),
+    queries: {
+      ...queryClient.getDefaultOptions().queries,
+      onError: (error) => {
+        console.error('[Query Error]', error)
+        message.error(getErrorMessage(error))
+        originalHandleQueryResult?.(error)
+      },
+    },
+    mutations: {
+      ...queryClient.getDefaultOptions().mutations,
+      onError: (error) => {
+        console.error('[Mutation Error]', error)
+        message.error(getErrorMessage(error))
+      },
+    },
+  })
+}

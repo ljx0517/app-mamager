@@ -2,49 +2,6 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AppInfo } from '@/types'
 
-/**
- * 模拟 App 数据
- * 接入 tRPC 后从服务端获取
- */
-export const MOCK_APPS: AppInfo[] = [
-  {
-    id: 'app_001',
-    name: 'AI Keyboard',
-    slug: 'ai-keyboard',
-    description: '智能 AI 键盘，用 AI 帮你回复消息',
-    icon: '⌨️',
-    platform: 'ios',
-    bundleId: 'com.jaxon.aikeyboard',
-    status: 'active',
-    createdAt: '2026-01-01T00:00:00Z',
-    updatedAt: '2026-02-10T00:00:00Z',
-  },
-  {
-    id: 'app_002',
-    name: 'AI Translator',
-    slug: 'ai-translator',
-    description: '实时 AI 翻译助手，支持多语言互译',
-    icon: '🌐',
-    platform: 'cross_platform',
-    bundleId: 'com.jaxon.aitranslator',
-    status: 'active',
-    createdAt: '2026-01-15T00:00:00Z',
-    updatedAt: '2026-02-08T00:00:00Z',
-  },
-  {
-    id: 'app_003',
-    name: 'AI Writer',
-    slug: 'ai-writer',
-    description: '智能写作助手，一键生成高质量文案',
-    icon: '✍️',
-    platform: 'ios',
-    bundleId: 'com.jaxon.aiwriter',
-    status: 'maintenance',
-    createdAt: '2026-02-01T00:00:00Z',
-    updatedAt: '2026-02-09T00:00:00Z',
-  },
-]
-
 interface AppState {
   /** 所有 App 列表 */
   apps: AppInfo[]
@@ -67,8 +24,8 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
-      apps: MOCK_APPS,
-      currentAppId: MOCK_APPS[0]?.id ?? null,
+      apps: [],
+      currentAppId: null,
 
       get currentApp() {
         const state = get()
@@ -77,7 +34,13 @@ export const useAppStore = create<AppState>()(
 
       setCurrentApp: (appId) => set({ currentAppId: appId }),
 
-      setApps: (apps) => set({ apps }),
+      setApps: (apps) => set((state) => ({
+        apps,
+        // 如果当前选中的 App 不在列表中，自动切换到第一个
+        currentAppId: state.currentAppId && apps.some(a => a.id === state.currentAppId)
+          ? state.currentAppId
+          : apps[0]?.id ?? null
+      })),
 
       addApp: (app) =>
         set((state) => ({ apps: [...state.apps, app] })),

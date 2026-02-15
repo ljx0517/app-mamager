@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Layout, Menu, Avatar, Dropdown, theme, Button, Space, Divider } from 'antd'
 import {
@@ -15,8 +15,10 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
+import { trpc } from '@/utils/trpc'
 import { PLATFORM_NAME } from '@/utils/constants'
 import AppSwitcher from '@/components/AppSwitcher'
+import type { AppInfo } from '@/types'
 
 const { Header, Sider, Content } = Layout
 
@@ -25,8 +27,44 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, logout } = useAuthStore()
-  const currentApp = useAppStore((s) => s.apps.find((a) => a.id === s.currentAppId))
+  const { apps, currentAppId, setApps, setCurrentApp } = useAppStore()
+  const currentApp = apps.find((a) => a.id === currentAppId)
   const { token: themeToken } = theme.useToken()
+
+  // 获取应用列表
+  const { data: appsData, isLoading: appsLoading, error: appsError } = trpc.app.list.useQuery(undefined)
+
+  // 处理 API 返回的数据
+  useEffect(() => {
+    console.log('[AdminLayout] appsData:', appsData, 'error:', appsError)
+    if (appsData && Array.isArray(appsData)) {
+      const appList: AppInfo[] = appsData.map((app) => ({
+        id: app.id,
+        name: app.name,
+        slug: app.slug || '',
+        description: app.description || '',
+        icon: '📱',
+        platform: app.platform as 'ios' | 'android' | 'web' | 'cross_platform',
+        bundleId: app.bundleId,
+        status: app.status as 'active' | 'inactive' | 'maintenance' | 'archived',
+        createdAt: app.createdAt?.toString() || new Date().toISOString(),
+        updatedAt: app.updatedAt?.toString() || new Date().toISOString(),
+      }))
+      console.log('[AdminLayout] 转换后的 appList:', appList)
+      setApps(appList)
+      // 如果没有选中的应用，自动选中第一个
+      if (!currentAppId && appList.length > 0) {
+        setCurrentApp(appList[0].id)
+      }
+    }
+  }, [appsData, appsError, currentAppId, setApps, setCurrentApp])
+
+  // 调试：打印错误（使用 useEffect 避免每次渲染都执行）
+  useEffect(() => {
+    if (appsError) {
+      console.error('获取应用列表失败:', appsError)
+    }
+  }, [appsError])
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -134,7 +172,7 @@ export default function AdminLayout() {
         </div>
 
         {/* App 切换器 */}
-        <AppSwitcher collapsed={collapsed} />
+        <AppSwitcher collapsed={collapsed} loading={appsLoading} error={appsError} />
 
         <Divider style={{ margin: '4px 16px', minWidth: 'auto', width: 'auto' }} />
 

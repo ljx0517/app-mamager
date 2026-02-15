@@ -110,7 +110,10 @@ export default function SubscriptionsPage() {
   const allSubs = useMemo(() => {
     if (!subscriptionsData) return []
 
-    return subscriptionsData.map((sub: any) => ({
+    // 后端返回的是 { items: [...], total, limit, offset }
+    const items = subscriptionsData.items || subscriptionsData
+
+    return (items as any[]).map((sub: any) => ({
       id: sub.id,
       appId: sub.appId || currentAppId || '',
       userId: sub.userId,
@@ -128,10 +131,10 @@ export default function SubscriptionsPage() {
   const stats = useMemo(() => {
     if (statsData) {
       return {
-        totalActive: statsData.active || 0,
-        totalMonthly: statsData.monthly || 0,
-        totalYearly: statsData.yearly || 0,
-        totalTrial: statsData.trial || 0,
+        totalActive: statsData.byStatus?.active || 0,
+        totalMonthly: statsData.byTier?.proMonthly || 0,
+        totalYearly: statsData.byTier?.proYearly || 0,
+        totalTrial: 0,
       }
     }
 
