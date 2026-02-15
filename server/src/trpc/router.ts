@@ -10,6 +10,31 @@ import { aiRouter } from "../routers/ai.js";
 import { styleRouter } from "../routers/style.js";
 import { subscriptionRouter } from "../routers/subscription.js";
 
+// 导入 App 配置模块（动态注册）
+import { getAllConfigModules } from "@/app_settings/registry";
+
+/**
+ * 构建 App 配置路由对象
+ * 将所有已注册的 App 配置路由挂载到对应配置名下
+ */
+function buildAppRouters() {
+  const configModules = getAllConfigModules();
+  const appRouters: Record<string, any> = {};
+
+  for (const configModule of configModules) {
+    const configName = configModule.configName;
+
+    // 将每个配置的路由挂载到其配置名下
+    for (const [routeName, routeDef] of Object.entries(configModule.routers)) {
+      // 例如：ai-keyboard-pro.customReply
+      const fullPath = `${configName}.${routeName}`;
+      appRouters[fullPath] = routeDef;
+    }
+  }
+
+  return appRouters;
+}
+
 /**
  * 根路由 - 多 App 管理后台
  *
@@ -24,6 +49,10 @@ import { subscriptionRouter } from "../routers/subscription.js";
  *  │ ai.*                 AI 回复生成       │
  *  │ style.*              说话风格管理      │
  *  │ subscription.*       订阅查询与验证     │
+ *  └──────────────────────────────────────┘
+ *  ┌─ App 配置路由（按 configName 隔离）───┐
+ *  │ ai-keyboard-pro.*    AI Keyboard Pro  │
+ *  │ ai-keyboard-lite.*  AI Keyboard Lite  │
  *  └──────────────────────────────────────┘
  */
 export const appRouter = router({
@@ -40,6 +69,9 @@ export const appRouter = router({
   ai: aiRouter,
   style: styleRouter,
   subscription: subscriptionRouter,
+
+  // App 配置路由（动态挂载）
+  ...buildAppRouters(),
 });
 
 /** 导出路由类型供客户端使用 */

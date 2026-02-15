@@ -22,6 +22,27 @@
       "when": 1771008075740,
       "tag": "0002_colorful_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771080898538,
+      "tag": "0003_spotty_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1771083257310,
+      "tag": "0004_natural_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771084463315,
+      "tag": "0005_productive_nightshade",
+      "breakpoints": true
     }
   ]
 }

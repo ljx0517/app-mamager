@@ -129,7 +129,23 @@ graph TD
 3. **protectedProcedure** - 需要 `x-api-key` + `x-device-id` 或 JWT Token（用户级别）
 4. **adminProcedure** - 需要管理员 JWT 认证（管理后台）
 
-#### 3. 路由组织
+#### 3. App 配置系统（configName）
+
+系统支持通过 `configName` 字段为不同 App 配置专属功能，实现配置复用：
+
+- **数据库变更**：`apps` 表新增 `configName` 字段（默认 `common`）
+- **配置目录**：`src/app_settings/` 下按配置名创建文件夹
+- **路由访问**：`/trpc/{configName}.{routeName}.*`
+- **配置复用**：多个 App 可以使用同一个 `configName`，共享特色功能
+
+示例：
+| bundleId | configName | 路由前缀 |
+|----------|-----------|---------|
+| com.jaxon.aikeyboard | ai-keyboard-pro | ai-keyboard-pro.* |
+| com.jaxon.aikeyboard.lite | ai-keyboard-pro | ai-keyboard-pro.* |
+| com.other.app | common | (无专属路由) |
+
+#### 4. 路由组织
 tRPC 路由分为两大类别：
 
 **管理后台路由**（需要管理员认证）：
@@ -448,7 +464,87 @@ export const exampleRouter = router({
 1. **注册新 App**：通过管理后台或直接向 `apps` 表插入记录
 2. **生成密钥**：系统会自动生成唯一的 `apiKey` 和 `apiSecret`
 3. **配置订阅计划**：在 `subscriptionPlans` 表中为该 App 创建计划
-4. **客户端集成**：客户端使用分配的 `apiKey` 调用 API
+4. **选择配置**：设置 `configName` 字段关联 `app_settings` 目录下的配置
+5. **客户端集成**：客户端使用分配的 `apiKey` 调用 API
+
+### App 配置系统
+
+#### 概述
+
+App 配置系统允许为不同 App 定义专属功能模块，实现配置复用。一个配置可以被多个 App 使用。
+
+```
+src/app_settings/
+├── registry.ts              # 配置注册中心
+├── common/                 # 默认配置（无特色功能）
+│   ├── index.ts
+│   └── config.ts
+└── ai-keyboard-pro/       # 专业版键盘配置
+    ├── index.ts            # 配置入口
+    ├── config.ts           # 配置详情
+    ├── types.ts            # 类型定义
+    ├── routers/            # 专属路由
+    │   ├── customReply.ts
+    │   └── keywordReply.ts
+    └── services/           # 专属服务
+        └── KeywordMatcher.ts
+```
+
+#### 核心概念
+
+| 概念 | 说明 |
+|------|------|
+| **configName** | 配置名称，关联 `app_settings` 目录下的配置文件夹 |
+| **AppModuleConfig** | 配置内容，包含功能开关、限制、AI、业务配置 |
+| **AppConfigModule** | 配置模块，包含路由、服务、配置、REST 路由定义 |
+| **registerAppConfig** | 注册函数，将配置模块注册到系统 |
+
+#### 配置接口
+
+```typescript
+interface AppConfigModule {
+  configName: string;           // 配置名称（唯一标识）
+  description?: string;         // 配置描述
+  routers: Record<string, any>; // 专属路由
+  services?: AppService[];      // 专属服务
+  config: AppModuleConfig;     // 配置内容
+  restRoutes?: RestRouteDefinition[]; // REST 路由
+}
+```
+
+#### 创建新配置
+
+1. 在 `src/app_settings/` 下创建新文件夹（如 `ai-keyboard-lite/`）
+2. 创建 `config.ts` 定义配置内容
+3. 创建 `index.ts` 使用 `registerAppConfig` 注册
+4. 在专属路由文件夹中添加特色功能路由
+5. 在 `src/index.ts` 中导入配置模块
+
+#### 现有配置
+
+- **common**：默认配置，不包含特色功能
+- **ai-keyboard-pro**：AI Keyboard 专业版，包含自定义回复、关键词自动回复
+
+#### 路由访问
+
+配置路由通过 `{configName}.{routeName}.*` 访问：
+
+```bash
+# ai-keyboard-pro 配置的路由
+/trpc/ai-keyboard-pro.customReply.generate
+/trpc/ai-keyboard-pro.keywordReply.match
+```
+
+#### 数据库关联
+
+```sql
+-- apps 表
+ALTER TABLE apps ADD COLUMN config_name VARCHAR(100) DEFAULT 'common';
+
+-- 设置 App 使用特定配置
+UPDATE apps SET config_name = 'ai-keyboard-pro'
+WHERE bundle_id = 'com.jaxon.aikeyboard';
+```
 
 ## 配置文件说明
 
@@ -508,6 +604,23 @@ A: 支持两种方式：1) `x-api-key` + `x-device-id`（传统方式）；2) `x
 ### Q: 管理后台如何认证？
 A: 支持两种 Token 格式：1) JWT Token（新）包含管理员信息和过期时间；2) 简易 Token（旧）`admin:<id>` 格式，向后兼容。
 
+### Q: 如何为 App 添加特色功能？
+A:
+1. 在 `src/app_settings/` 下创建新配置文件夹
+2. 使用 `registerAppConfig` 注册配置模块
+3. 在专属路由中添加特色功能接口
+4. 在数据库中设置 App 的 `configName` 为配置名称
+
+### Q: 多个 App 如何共享同一配置？
+A: 将多个 App 的 `configName` 设置为相同的值即可共享配置。例如：
+```sql
+UPDATE apps SET config_name = 'ai-keyboard-pro'
+WHERE bundle_id IN ('com.app1', 'com.app2', 'com.app3');
+```
+
+### Q: 如何切换 App 的配置？
+A: 更新数据库中 App 的 `configName` 字段即可切换配置，无需重启服务。
+
 ## 关键文件清单
 
 ### 核心文件
@@ -515,6 +628,11 @@ A: 支持两种 Token 格式：1) JWT Token（新）包含管理员信息和过�
 - `src/trpc/router.ts` - tRPC 根路由定义
 - `src/trpc/index.ts` - tRPC 中间件和 procedure 定义
 - `src/trpc/context.ts` - tRPC 上下文创建
+
+### App 配置系统文件
+- `src/app_settings/registry.ts` - 配置注册中心
+- `src/app_settings/common/` - 默认配置
+- `src/app_settings/ai-keyboard-pro/` - AI Keyboard Pro 配置
 
 ### 路由文件
 - `src/routers/admin.ts` - 管理员路由
@@ -583,8 +701,51 @@ A: 支持两种 Token 格式：1) JWT Token（新）包含管理员信息和过�
 - 涉及数据变更时，建议先备份或确认影响范围
 - 需要数据库操作时，请确认已配置正确的环境变量
 - 对于复杂任务，可请求分阶段执行或提供更多上下文信息
+- **本目录（server）外的代码不属于我的工作范围**，如有需要请联系对应模块的开发人员
+
+### 角色定位
+- **身份**：积极主动、热心的后端开发人员
+- **工作目录**：`~/Workspace/github/app-manager__server/server`
+- **职责范围**：仅负责本目录下的后端代码开发，不改动其他目录的代码
+- **协作模式**：根据用户指令执行后端开发任务，提供技术建议和解决方案
+
+### 角色设定：极具创新思维 + 顶级产品思维的资深服务端开发专家
+
+#### 1. 身份定位
+一名多年经验的**服务端架构/开发工程师**，同时具备**资深产品经理**的思考能力，擅长用**技术视角做产品决策，用产品思维做技术设计**。
+
+#### 2. 核心能力
+- **服务端底层视角**：精通接口设计、数据模型、并发性能、存储成本、扩展性、安全性、开发成本；
+- **产品思维**：能抓**用户真实需求**、业务闭环、体验痛点、产品价值、迭代路径；
+- **创新思维**：敢于打破常规，脑暴差异化、降本增效、体验升级的新思路。
+
+#### 3. 回答规则（必须遵守）
+当提出**产品问题/需求/方案**时，同时输出 4 部分内容：
+1) **产品本质**：这个需求/问题的真正目标、核心用户价值是什么；
+2) **服务端视角判断**：现有方案的技术成本、风险、瓶颈、可行性；
+3) **创新脑暴**：更优的产品思路、差异化设计、体验提升点；
+4) **落地建议**：产品+服务端结合的最简可行方案、迭代步骤。
+
+**输出要求**：务实、有价值、可落地，不空谈产品，不固守技术，永远给出**比原题更好的建议**。
+
+#### 4. 思考框架
+- **WHY**：这个功能解决了什么核心用户痛点？是否有更简单的 MVP 实现方式？
+- **SO WHAT**：从服务端视角看，这个设计在大规模并发下会崩吗？是否有潜在的技术债？
+- **WHAT IF**：如果利用 [某种新技术/架构]，是否能创造出产品经理没想到的新玩法？
 
 ## 变更记录 (Changelog)
+
+- **2026-02-14** - App 配置系统重构
+  - 新增 `app_settings/` 目录管理 App 特色配置
+  - `apps` 表新增 `configName` 字段实现配置复用
+  - 重构路由加载机制，支持动态配置路由
+  - 添加 `common` 默认配置和 `ai-keyboard-pro` 示例配置
+  - 更新 CLAUDE.md 添加完整配置系统文档
+
+- **2026-02-14** - 角色设定更新
+  - 添加极具产品思维的技术架构专家角色设定
+  - 定义核心能力：服务端视角、产品思维、创新思维
+  - 明确回答规则：产品本质、技术判断、创新脑暴、落地建议
 
 - **2026-02-13** - AI助手协作指南添加
   - 添加AI助手角色定位和技术栈专注说明

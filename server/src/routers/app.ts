@@ -35,6 +35,9 @@ export const appRouter = router({
         bundleId: z.string().min(1).max(255),
         platform: z.enum(["ios", "android", "web"]).optional().default("ios"),
         description: z.string().optional(),
+        configName: z.string().min(1).max(100).optional().default("common"),
+        configTemplate: z.string().min(1).max(100).optional(),
+        slug: z.string().min(1).max(100).optional(),
         settings: z
           .object({
             freeReplyLimitPerDay: z.number().optional().default(10),
@@ -59,6 +62,9 @@ export const appRouter = router({
           bundleId: input.bundleId,
           platform: input.platform,
           description: input.description,
+          configName: input.configName ?? "common",
+          configTemplate: input.configTemplate,
+          slug: input.slug,
           apiKey,
           apiSecret,
           settings: input.settings ?? {
@@ -89,7 +95,13 @@ export const appRouter = router({
    * 获取所有应用列表
    */
   list: adminProcedure.query(async ({ ctx }) => {
-    return await ctx.db.select().from(apps).orderBy(apps.createdAt);
+    const appList = await ctx.db.select().from(apps).orderBy(apps.createdAt);
+
+    // 转换 isActive 为 status 字段
+    return appList.map((app) => ({
+      ...app,
+      status: app.isActive ? "active" : "inactive",
+    }));
   }),
 
   /**
@@ -132,6 +144,9 @@ export const appRouter = router({
         name: z.string().min(1).max(100).optional(),
         description: z.string().optional(),
         isActive: z.boolean().optional(),
+        configName: z.string().min(1).max(100).optional(),
+        configTemplate: z.string().min(1).max(100).optional(),
+        slug: z.string().min(1).max(100).optional(),
         settings: z
           .object({
             freeReplyLimitPerDay: z.number().optional(),

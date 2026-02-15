@@ -459,7 +459,7 @@ export const subscriptionManageRouter = router({
           active: statusMap.active ?? 0,
           expired: statusMap.expired ?? 0,
           cancelled: statusMap.cancelled ?? 0,
-          gracePeroid: statusMap.grace_period ?? 0,
+          gracePeriod: statusMap.grace_period ?? 0,
         },
         byTier: {
           free: tierMap.free ?? 0,
