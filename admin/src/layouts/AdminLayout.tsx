@@ -9,6 +9,7 @@ import {
   AppstoreOutlined,
   CloudServerOutlined,
   MobileOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
@@ -76,6 +77,15 @@ export default function AdminLayout() {
       key: '/apps',
       icon: <AppstoreOutlined />,
       label: '应用管理',
+    },
+    {
+      key: 'system',
+      icon: <SettingOutlined />,
+      label: '系统管理',
+      children: [
+        { key: '/settings/templates', label: '模板管理' },
+        { key: '/settings/system', label: '系统配置' },
+      ],
     },
   ]
 
