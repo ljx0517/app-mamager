@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, React, Suspense } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
 import AdminLayout from '@/layouts/AdminLayout'
@@ -10,6 +10,10 @@ import SubscriptionsPage from '@/pages/Subscriptions'
 import AnalyticsPage from '@/pages/Analytics'
 import SettingsPage from '@/pages/Settings'
 import AppsPage from '@/pages/Apps'
+
+// 懒加载页面
+const SettingsTemplatesPage = React.lazy(() => import('@/pages/Settings/templates'))
+const SettingsSystemPage = React.lazy(() => import('@/pages/Settings/system'))
 
 /**
  * 路由守卫：未登录时重定向到登录页
@@ -89,6 +93,16 @@ export default function App() {
       >
         {/* 全局管理页面 */}
         <Route path="/apps" element={<AppsPage />} />
+        <Route path="/settings/templates" element={
+          <Suspense fallback={<div>加载中...</div>}>
+            <SettingsTemplatesPage />
+          </Suspense>
+        } />
+        <Route path="/settings/system" element={
+          <Suspense fallback={<div>加载中...</div>}>
+            <SettingsSystemPage />
+          </Suspense>
+        } />
 
         {/* 某个 App 的业务页面 */}
         <Route path="/:appId/dashboard" element={<DashboardPage />} />
