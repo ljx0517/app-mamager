@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊商键盘原型 - 极简版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .phone {
+            width: 390px;
+            height: 850px;
+            background: #000;
+            border-radius: 50px;
+            box-shadow: 0 0 100px rgba(74, 144, 226, 0.3);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 模拟聊天界面 */
+        .chat-screen {
+            height: 50%;
+            background: #0f0f1a;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .chat-time {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin: 16px 0;
+        }
+
+        .chat-message {
+            max-width: 75%;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-message.their {
+            align-items: flex-start;
+        }
+
+        .chat-message.mine {
+            flex-direction: row-reverse;
+            margin-left: auto;
+        }
+
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .chat-bubble {
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .chat-message.their .chat-bubble {
+            background: #2a2a3e;
+            color: #fff;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.mine .chat-bubble {
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        /* 输入框区域 */
+        .input-area {
+            background: #1a1a2e;
+            padding: 8px 16px;
+            border-top: 1px solid #2a2a3e;
+        }
+
+        .input-wrapper {
+            background: #2a2a3e;
+            border-radius: 24px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .input-text {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .input-text::placeholder {
+            color: #666;
+        }
+
+        /* 聊商键盘 - 极简设计 */
+        .chatq-keyboard {
+            height: 50%;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 合并内容区 */
+        .merge-area {
+            padding: 12px 16px;
+            background: rgba(74, 144, 226, 0.08);
+            border-bottom: 1px solid #2a2a3e;
+        }
+
+        .merge-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .merge-label {
+            font-size: 12px;
+            color: #4A90E2;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .merge-count {
+            font-size: 11px;
+            color: #666;
+            background: #2a2a3e;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .merge-content {
+            background: #2a2a3e;
+            border-radius: 12px;
+            padding: 12px;
+            position: relative;
+        }
+
+        .merge-text {
+            font-size: 14px;
+            color: #fff;
+            line-height: 1.6;
+        }
+
+        .merge-delete {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 20px;
+            height: 20px;
+            background: #3a3a4e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #888;
+            cursor: pointer;
+        }
+
+        /* 人设快捷栏 */
+        .persona-bar {
+            padding: 10px 16px;
+            border-bottom: 1px solid #2a2a3e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .persona-current {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: linear-gradient(135deg, rgba(74,144,226,0.3), rgba(103,184,222,0.3));
+            border: 1px solid #4A90E2;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        .persona-current-icon {
+            font-size: 16px;
+        }
+
+        .persona-current-name {
+            font-size: 13px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .persona-current-scene {
+            font-size: 11px;
+            color: #4A90E2;
+        }
+
+        .persona-list {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        .persona-list::-webkit-scrollbar {
+            display: none;
+        }
+
+        .persona-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #2a2a3e;
+            border-radius: 16px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .persona-chip:active {
+            transform: scale(0.95);
+        }
+
+        .persona-chip-icon {
+            font-size: 14px;
+        }
+
+        .persona-chip-name {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* AI 回复区域 */
+        .ai-area {
+            flex: 1;
+            padding: 12px 16px;
+            overflow-y: auto;
+        }
+
+        /* 回复卡片 - 极简 */
+        .ai-reply-card {
+            background: #2a2a3e;
+            border-radius: 16px;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .ai-reply-card:active {
+            transform: scale(0.98);
+        }
+
+        /* 默认选中第一条 */
+        .ai-reply-card.selected {
+            border-color: #4A90E2;
+            background: rgba(74, 144, 226, 0.1);
+        }
+
+        .ai-reply-type {
+            font-size: 11px;
+            color: #4A90E2;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ai-reply-content {
+            font-size: 14px;
+            color: #fff;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .ai-reply-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .ai-action-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ai-action-btn.copy {
+            background: #3a3a4e;
+            color: #aaa;
+        }
+
+        .ai-action-btn.send {
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .ai-action-btn.send:active {
+            transform: scale(0.95);
+        }
+
+        /* 底部操作栏 */
+        .keyboard-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            border-top: 1px solid #2a2a3e;
+        }
+
+        .footer-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            background: #2a2a3e;
+            border-radius: 16px;
+            font-size: 12px;
+            color: #888;
+            cursor: pointer;
+        }
+
+        .footer-btn:active {
+            transform: scale(0.95);
+        }
+
+        .footer-btn.primary {
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            color: #fff;
+            padding: 10px 24px;
+            font-weight: 600;
+        }
+
+        /* 意图识别提示 */
+        .intent-tip {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 0 16px 12px;
+            padding: 10px 14px;
+            background: rgba(255, 152, 0, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 152, 0, 0.2);
+        }
+
+        .intent-tip-icon {
+            font-size: 14px;
+        }
+
+        .intent-tip-title {
+            font-size: 12px;
+            color: #FF9800;
+            font-weight: 600;
+        }
+
+        .intent-tip-desc {
+            font-size: 11px color: #888;
+            margin-top: 2px;
+        }
+
+        /* 键盘切换 */
+        .keyboard-switch {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            border-top: 1px solid #2a2a3e;
+            cursor: pointer;
+        }
+
+        .switch-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #2a2a3e;
+            border-radius: 14px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone">
+        <!-- 聊天界面 -->
+        <div class="chat-screen">
+            <div class="chat-time">今天 14:30</div>
+
+            <div class="chat-message their">
+                <div class="chat-avatar">💕</div>
+                <div class="chat-bubble">
+                    周六有什么安排呀？
+                </div>
+            </div>
+
+            <div class="chat-message mine">
+                <div class="chat-avatar" style="background: linear-gradient(135deg, #4A90E2, #67B8DE);">我</div>
+                <div class="chat-bubble">
+                    怎么了呀？😊
+                </div>
+            </div>
+
+            <div class="chat-time">14:35</div>
+
+            <div class="chat-message their">
+                <div class="chat-avatar">💕</div>
+                <div class="chat-bubble">
+                    就是想问问我有没有空呀~
+                </div>
+            </div>
+        </div>
+
+        <!-- 输入框 -->
+        <div class="input-area">
+            <div class="input-wrapper">
+                <span style="font-size:20px;">😊</span>
+                <input type="text" class="input-text" placeholder="发送消息...">
+                <span style="font-size:20px;">📷</span>
+            </div>
+        </div>
+
+        <!-- 聊商键盘 -->
+        <div class="chatq-keyboard">
+            <!-- 消息列表区 -->
+            <div class="merge-area">
+                <div class="merge-header">
+                    <div class="merge-label">
+                        <span>📋</span> 对方消息
+                        <span class="merge-count">2条</span>
+                    </div>
+                    <div style="font-size:12px;color:#666;" onclick="showToast('点击可编辑')">编辑</div>
+                </div>
+                <div class="merge-content">
+                    <div class="merge-text">
+                        1. 周六有什么安排呀？<br>
+                        2. 就是想问问我有没有空呀~
+                    </div>
+                    <div class="merge-delete" onclick="showToast('删除此条')">×</div>
+                </div>
+            </div>
+
+            <!-- 人设快捷栏 -->
+            <div class="persona-bar">
+                <div class="persona-current" onclick="showToast('点击切换人设')">
+                    <span class="persona-current-icon">💕</span>
+                    <span class="persona-current-name">to女朋友</span>
+                    <span class="persona-current-scene">日常</span>
+                    <span style="font-size:10px;color:#666;margin-left:4px;">✓</span>
+                </div>
+                <div class="persona-list">
+                    <div class="persona-chip" onclick="selectPersona(this)">
+                        <span class="persona-chip-icon">👩</span>
+                        <span class="persona-chip-name">闺蜜</span>
+                    </div>
+                    <div class="persona-chip" onclick="selectPersona(this)">
+                        <span class="persona-chip-icon">👨</span>
+                        <span class="persona-chip-name">老板</span>
+                    </div>
+                    <div class="persona-chip" onclick="showToast('更多')">
+                        <span class="persona-chip-icon">➕</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 意图识别 -->
+            <div class="intent-tip">
+                <div class="intent-tip-icon">🧠</div>
+                <div>
+                    <div class="intent-tip-title">意图：暗示约会</div>
+                    <div class="intent-tip-desc">对方可能在暗示想见你</div>
+                </div>
+            </div>
+
+            <!-- AI 回复 -->
+            <div class="ai-area">
+                <!-- 默认选中第一条 -->
+                <div class="ai-reply-card selected" onclick="selectReply(this)">
+                    <div class="ai-reply-type">
+                        <span>⭐</span> 推荐
+                    </div>
+                    <div class="ai-reply-content">
+                        "你问这个是不是想约我呀～😊<br>
+                        我周六都有空呀，你想干嘛呀？<br>
+                        是不是想见我啦？💕"
+                    </div>
+                    <div class="ai-reply-actions">
+                        <div class="ai-action-btn copy" onclick="event.stopPropagation();showToast('已复制')">
+                            📋 复制
+                        </div>
+                        <div class="ai-action-btn send" onclick="event.stopPropagation();sendMessage()">
+                            🚀 发送
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ai-reply-card" onclick="selectReply(this)">
+                    <div class="ai-reply-type">调皮主动型</div>
+                    <div class="ai-reply-content">
+                        "嘿嘿，是不是想我啦？<br>
+                        我周六全天待命！<br>
+                        你定时间地点，我准时到～😎"
+                    </div>
+                    <div class="ai-reply-actions">
+                        <div class="ai-action-btn copy" onclick="event.stopPropagation();showToast('已复制')">
+                            📋 复制
+                        </div>
+                        <div class="ai-action-btn send" onclick="event.stopPropagation();sendMessage()">
+                            🚀 发送
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ai-reply-card" onclick="selectReply(this)">
+                    <div class="ai-reply-type">简洁直接型</div>
+                    <div class="ai-reply-content">
+                        "周六都有空呀～<br>
+                        你想怎么安排？"
+                    </div>
+                    <div class="ai-reply-actions">
+                        <div class="ai-action-btn copy" onclick="event.stopPropagation();showToast('已复制')">
+                            📋 复制
+                        </div>
+                        <div class="ai-action-btn send" onclick="event.stopPropagation();sendMessage()">
+                            🚀 发送
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部操作 -->
+            <div class="keyboard-footer">
+                <div class="footer-btn" onclick="showToast('重新生成中...')">
+                    <span>🔄</span> 重新生成
+                </div>
+                <div class="footer-btn primary" onclick="sendMessage()">
+                    🚀 发送选中回复
+                </div>
+            </div>
+
+            <!-- 键盘切换 -->
+            <div class="keyboard-switch" onclick="showToast('切换键盘')">
+                <div class="switch-btn">
+                    <span>🌐</span> 切换到其他输入法
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">已复制</div>
+
+    <script>
+        // 选择回复
+        function selectReply(el) {
+            document.querySelectorAll('.ai-reply-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 选择人设
+        function selectPersona(el) {
+            const chips = document.querySelectorAll('.persona-chip');
+            chips.forEach(c => c.style.background = '#2a2a3e');
+            chips.forEach(c => c.style.color = '#aaa');
+            el.style.background = 'linear-gradient(135deg, rgba(74,144,226,0.3), rgba(103,184,222,0.3))';
+            el.style.color = '#fff';
+            showToast('已切换人设');
+        }
+
+        // 发送消息
+        function sendMessage() {
+            showToast('发送成功！');
+        }
+
+        // Toast
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

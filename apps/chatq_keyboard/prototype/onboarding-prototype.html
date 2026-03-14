@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊商 - 引导流程</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .phone {
+            width: 390px;
+            height: 844px;
+            background: #000;
+            border-radius: 40px;
+            box-shadow: 0 0 100px rgba(74, 144, 226, 0.3);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 引导页面 */
+        .onboarding-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.5s ease;
+        }
+
+        /* 背景 */
+        .onboarding-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+        }
+
+        .onboarding-bg-1 {
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+        }
+
+        .onboarding-bg-2 {
+            background: linear-gradient(180deg, #4A90E2 0%, #67B8DE 100%);
+        }
+
+        .onboarding-bg-3 {
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .onboarding-bg-4 {
+            background: linear-gradient(180deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .onboarding-bg-5 {
+            background: linear-gradient(180deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .onboarding-bg-6 {
+            background: linear-gradient(180deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .onboarding-bg-7 {
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* 装饰圆球 */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.5;
+        }
+
+        .orb-1 {
+            width: 200px;
+            height: 200px;
+            background: #4A90E2;
+            top: -50px;
+            right: -50px;
+        }
+
+        .orb-2 {
+            width: 150px;
+            height: 150px;
+            background: #67B8DE;
+            bottom: 100px;
+            left: -50px;
+        }
+
+        /* 页面内容 */
+        .onboarding-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            color: #fff;
+        }
+
+        .onboarding-icon {
+            font-size: 80px;
+            margin-bottom: 32px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .onboarding-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.8) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .onboarding-desc {
+            font-size: 16px;
+            line-height: 1.8;
+            opacity: 0.9;
+            margin-bottom: 40px;
+        }
+
+        /* 按钮 */
+        .onboarding-btn {
+            padding: 16px 48px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .onboarding-btn-primary {
+            background: #fff;
+            color: #333;
+        }
+
+        .onboarding-btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255,255,255,0.3);
+        }
+
+        .onboarding-btn-outline {
+            background: transparent;
+            border: 2px solid rgba(255,255,255,0.5);
+            color: #fff;
+        }
+
+        /* 进度指示 */
+        .progress-dots {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 30px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            width: 24px;
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        /* 功能卡片 */
+        .feature-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            text-align: left;
+            backdrop-filter: blur(10px);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .feature-text h4 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .feature-text p {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        /* 步骤指示 */
+        .step-indicator {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            z-index: 1;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .step.active {
+            color: #fff;
+        }
+
+        .step-num {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .step.active .step-num {
+            background: #fff;
+            color: #333;
+        }
+
+        /* 表单区域 */
+        .form-area {
+            position: relative;
+            z-index: 1;
+            padding: 0 24px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 16px 20px;
+            border-radius: 16px;
+            border: none;
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            margin-bottom: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            background: rgba(255,255,255,0.25);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255,255,255,0.6);
+        }
+
+        /* 验证码 */
+        .verify-code {
+            display: flex;
+            gap: 12px;
+        }
+
+        .verify-code .form-input {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .verify-code-btn {
+            padding: 16px 20px;
+            border-radius: 16px;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .verify-code-btn:disabled {
+            opacity: 0.5;
+        }
+
+        /* 选项卡片 */
+        .option-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .option-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .option-card:active {
+            transform: scale(0.98);
+        }
+
+        .option-card.selected {
+            border-color: #fff;
+            background: rgba(255,255,255,0.2);
+        }
+
+        .option-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .option-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .option-desc {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        /* 底部跳过 */
+        .skip-btn {
+            position: absolute;
+            bottom: 40px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 1;
+        }
+
+        /* 页码 */
+        .page-num {
+            position: absolute;
+            top: 60px;
+            right: 24px;
+            color: rgba(255,255,255,0.5);
+            font-size: 14px;
+            z-index: 1;
+        }
+
+        /* 动画 */
+        .fade-in {
+            animation: fadeIn 0.5s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 14px;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone">
+        <!-- 引导页1: 欢迎 -->
+        <div class="onboarding-page onboarding-bg-1" id="page-1">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+
+            <div class="page-num">1/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">🎭</div>
+                <div class="onboarding-title">聊商</div>
+                <div class="onboarding-desc">
+                    AI 智能聊天助手<br>
+                    让你沟通更得体、更高效
+                </div>
+                <button class="onboarding-btn onboarding-btn-primary" onclick="goToPage(2)">
+                    立即体验
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页2: 核心功能 -->
+        <div class="onboarding-page onboarding-bg-2" id="page-2" style="display:none;">
+            <div class="page-num">2/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">⚡</div>
+                <div class="onboarding-title">一键生成回复</div>
+                <div class="onboarding-desc">
+                    复制对方消息 → 点击人设 → AI自动生成<br>
+                    3条不同风格的回复供你选择
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div class="feature-card">
+                        <div class="feature-icon">👤</div>
+                        <div class="feature-text">
+                            <h4>人设定制</h4>
+                            <p>设置你的聊天风格</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-text">
+                            <h4>AI 智能</h4>
+                            <p>自动学习你的习惯</p>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">💬</div>
+                        <div class="feature-text">
+                            <h4>多场景覆盖</h4>
+                            <p>职场/恋爱/日常全覆盖</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 24px; position: relative; z-index: 1;">
+                <button class="onboarding-btn onboarding-btn-primary" style="width:100%;" onclick="goToPage(3)">
+                    下一步
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页3: 性别选择 -->
+        <div class="onboarding-page onboarding-bg-3" id="page-3" style="display:none;">
+            <div class="page-num">3/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">👫</div>
+                <div class="onboarding-title">你的性别</div>
+                <div class="onboarding-desc">
+                    帮助我们更好地为你推荐回复风格
+                </div>
+
+                <div class="option-grid">
+                    <div class="option-card selected" onclick="selectGender(this)">
+                        <div class="option-icon">👨</div>
+                        <div class="option-name">男</div>
+                    </div>
+                    <div class="option-card" onclick="selectGender(this)">
+                        <div class="option-icon">👩</div>
+                        <div class="option-name">女</div>
+                    </div>
+                    <div class="option-card" onclick="selectGender(this)">
+                        <div class="option-icon">🧑</div>
+                        <div class="option-name">其他</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 24px; position: relative; z-index: 1;">
+                <button class="onboarding-btn onboarding-btn-primary" style="width:100%;" onclick="goToPage(4)">
+                    下一步
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页4: 生日选择 -->
+        <div class="onboarding-page onboarding-bg-4" id="page-4" style="display:none;">
+            <div class="page-num">4/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">🎂</div>
+                <div class="onboarding-title">你的生日</div>
+                <div class="onboarding-desc">
+                    记录生日，AI会在特殊日子为你准备祝福
+                </div>
+
+                <div class="form-area" style="margin-top: 20px;">
+                    <input type="text" class="form-input" placeholder="点击选择生日" onclick="showToast('弹出日期选择器')" style="cursor:pointer;">
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <div class="option-card selected" style="flex-direction: row; justify-content: center; gap: 8px;" onclick="toggleAgePrivacy(this)">
+                        <span style="font-size: 18px;">🔒</span>
+                        <span style="font-size: 14px;">仅用于生日祝福，不对外展示</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 24px; position: relative; z-index: 1;">
+                <button class="onboarding-btn onboarding-btn-primary" style="width:100%;" onclick="goToPage(5)">
+                    下一步
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页5: 选择角色 -->
+        <div class="onboarding-page onboarding-bg-5" id="page-5" style="display:none;">
+            <div class="page-num">5/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">👤</div>
+                <div class="onboarding-title">你想扮演什么角色？</div>
+                <div class="onboarding-desc">
+                    选择一个你常用的身份<br>
+                    我们会为你定制专属回复风格
+                </div>
+
+                <div class="option-grid">
+                    <div class="option-card" onclick="selectOption(this)">
+                        <div class="option-icon">💼</div>
+                        <div class="option-name">职场人</div>
+                        <div class="option-desc">专业、干练</div>
+                    </div>
+                    <div class="option-card" onclick="selectOption(this)">
+                        <div class="option-icon">💕</div>
+                        <div class="option-name">恋爱达人</div>
+                        <div class="option-desc">温柔、浪漫</div>
+                    </div>
+                    <div class="option-card selected" onclick="selectOption(this)">
+                        <div class="option-icon">😊</div>
+                        <div class="option-name">社交达人</div>
+                        <div class="option-desc">幽默、有趣</div>
+                    </div>
+                    <div class="option-card" onclick="selectOption(this)">
+                        <div class="option-icon">💰</div>
+                        <div class="option-name">销售精英</div>
+                        <div class="option-desc">专业、热情</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 24px; position: relative; z-index: 1;">
+                <button class="onboarding-btn onboarding-btn-primary" style="width:100%;" onclick="goToPage(6)">
+                    下一步
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页6: 快速创建人设 -->
+        <div class="onboarding-page onboarding-bg-6" id="page-6" style="display:none;">
+            <div class="page-num">6/7</div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">🎯</div>
+                <div class="onboarding-title">创建你的第一个人设</div>
+                <div class="onboarding-desc">
+                    快速设置一个常用的聊天对象
+                </div>
+
+                <div class="form-area" style="margin-top: 20px;">
+                    <input type="text" class="form-input" placeholder="给 TA 起个名字（如：老板、女朋友）">
+
+                    <div style="color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 12px; text-align: left;">选择关系</div>
+                    <div class="option-grid" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="option-card" onclick="selectRelation(this)">上级</div>
+                        <div class="option-card selected" onclick="selectRelation(this)">恋人</div>
+                        <div class="option-card" onclick="selectRelation(this)">朋友</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="padding: 0 24px; position: relative; z-index: 1;">
+                <button class="onboarding-btn onboarding-btn-primary" style="width:100%;" onclick="goToPage(7)">
+                    完成创建
+                </button>
+            </div>
+
+            <div class="skip-btn" onclick="goToPage(7)">跳过 ›</div>
+        </div>
+
+        <!-- 引导页7: 完成 -->
+        <div class="onboarding-page onboarding-bg-7" id="page-7" style="display:none;">
+            <div class="orb orb-1" style="background: #667eea;"></div>
+            <div class="orb orb-2" style="background: #764ba2;"></div>
+
+            <div class="onboarding-content fade-in">
+                <div class="onboarding-icon">🎉</div>
+                <div class="onboarding-title">准备好了！</div>
+                <div class="onboarding-desc">
+                    现在你可以开始使用了<br>
+                    让聊天变得更轻松
+                </div>
+
+                <div style="background: rgba(255,255,255,0.2); border-radius: 16px; padding: 20px; margin: 20px 0; backdrop-filter: blur(10px);">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 32px;">👤</div>
+                        <div>
+                            <div style="font-weight: 600;">恋人</div>
+                            <div style="font-size: 12px; opacity: 0.8;">温柔 + 浪漫</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="onboarding-btn onboarding-btn-primary" onclick="showToast('进入App')">
+                    开始使用
+                </button>
+            </div>
+
+            <div class="progress-dots">
+                <div class="dot" onclick="goToPage(1)"></div>
+                <div class="dot" onclick="goToPage(2)"></div>
+                <div class="dot" onclick="goToPage(3)"></div>
+                <div class="dot" onclick="goToPage(4)"></div>
+                <div class="dot" onclick="goToPage(5)"></div>
+                <div class="dot" onclick="goToPage(6)"></div>
+                <div class="dot active" onclick="goToPage(7)"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">已保存</div>
+
+    <script>
+        // 页面切换
+        function goToPage(pageNum) {
+            // 隐藏所有页面
+            for (let i = 1; i <= 7; i++) {
+                document.getElementById('page-' + i).style.display = 'none';
+            }
+
+            // 显示目标页面
+            document.getElementById('page-' + pageNum).style.display = 'flex';
+
+            // 更新进度点
+            updateProgressDots(pageNum);
+        }
+
+        // 更新进度点
+        function updateProgressDots(activePage) {
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, index) => {
+                if (index < activePage - 1) {
+                    dot.classList.add('active');
+                } else if (index === activePage - 1) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        }
+
+        // 选择选项卡片
+        function selectOption(el) {
+            document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 选择关系
+        function selectRelation(el) {
+            const cards = el.parentElement.querySelectorAll('.option-card');
+            cards.forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 选择性别
+        function selectGender(el) {
+            document.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 切换年龄隐私开关
+        function toggleAgePrivacy(el) {
+            el.classList.toggle('selected');
+        }
+
+        // Toast
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+
+        // 初始化
+        goToPage(1);
+    </script>
+</body>
+</html>

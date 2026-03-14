@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊商 - AI智能聊天助手原型</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .phone {
+            width: 375px;
+            height: 812px;
+            background: #fff;
+            border-radius: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            height: 44px;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 14px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 页面容器 */
+        .pages {
+            height: calc(100% - 44px - 70px);
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .page {
+            display: none;
+            padding-bottom: 20px;
+            min-height: 100%;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* 底部导航 */
+        .tab-bar {
+            height: 70px;
+            background: #fff;
+            border-top: 1px solid #eee;
+            display: flex;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-item.active {
+            color: #4A90E2;
+        }
+
+        .tab-item .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        /* 通用组件 */
+        .header {
+            padding: 16px;
+            background: #fff;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .section-title {
+            padding: 16px 16px 8px;
+            font-size: 14px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .card {
+            background: #fff;
+            margin: 0 16px 12px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 25px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        .btn-block {
+            display: block;
+            width: calc(100% - 32px);
+            margin: 20px 16px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .tag-blue {
+            background: #E8F4FF;
+            color: #4A90E2;
+        }
+
+        .tag-pink {
+            background: #FCE8F0;
+            color: #E91E63;
+        }
+
+        .tag-green {
+            background: #E8F5E9;
+            color: #4CAF50;
+        }
+
+        .tag-orange {
+            background: #FFF3E0;
+            color: #FF9800;
+        }
+
+        /* 首页 - 键盘主界面 */
+        .clipboard-area {
+            margin: 16px;
+            background: #F8F9FA;
+            border-radius: 12px;
+            padding: 16px;
+            border: 2px dashed #ddd;
+        }
+
+        .clipboard-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .clipboard-content {
+            font-size: 16px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .persona-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 0 16px;
+        }
+
+        .persona-btn {
+            background: #fff;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .persona-btn:active {
+            transform: scale(0.95);
+        }
+
+        .persona-btn.selected {
+            border-color: #4A90E2;
+            background: #F0F7FF;
+        }
+
+        .persona-btn.add-btn {
+            border: 2px dashed #ddd;
+            background: #fafafa;
+        }
+
+        .persona-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .persona-scene {
+            font-size: 11px;
+            color: #4A90E2;
+        }
+
+        /* 生成结果页 */
+        .result-card {
+            background: #fff;
+            margin: 12px 16px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .result-card:active {
+            transform: scale(0.98);
+        }
+
+        .result-card.selected {
+            border: 2px solid #4A90E2;
+            background: #F8FAFF;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .result-type {
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .result-badge {
+            background: #FFD700;
+            color: #333;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .result-action {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .result-content {
+            font-size: 15px;
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .result-footer {
+            display: flex;
+            gap: 12px;
+        }
+
+        .result-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 20px;
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .result-btn-copy {
+            background: #F0F0F0;
+            color: #666;
+        }
+
+        .result-btn-send {
+            background: #4A90E2;
+            color: #fff;
+        }
+
+        /* 人设列表页 */
+        .persona-list-item {
+            background: #fff;
+            margin: 0 16px 12px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .persona-list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .persona-list-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .persona-list-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .persona-list-scenes {
+            font-size: 13px;
+            color: #666;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .scene-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-right: 8px;
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        /* 创建人设页 */
+        .form-group {
+            padding: 0 16px;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: #4A90E2;
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            font-size: 16px;
+            background: #fff;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+        }
+
+        .tag-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 16px;
+        }
+
+        .tag-select {
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: #f5f5f5;
+            color: #666;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag-select.selected {
+            background: #E8F4FF;
+            color: #4A90E2;
+        }
+
+        .tag-level {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        /* 上下文分析页 */
+        .analysis-card {
+            background: #fff;
+            margin: 12px 16px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .analysis-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .analysis-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .analysis-info {
+            flex: 1;
+        }
+
+        .analysis-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .analysis-meta {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .trend-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .trend-day {
+            font-size: 13px;
+            color: #999;
+            width: 80px;
+        }
+
+        .trend-content {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .trend-emoji {
+            font-size: 16px;
+            margin-left: 8px;
+        }
+
+        .suggestion-card {
+            background: #FFF8E1;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 16px;
+            border: 1px solid #FFE082;
+        }
+
+        .suggestion-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #F57C00;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .suggestion-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-info {
+            flex: 1;
+        }
+
+        .suggestion-tag {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .suggestion-change {
+            font-size: 12px;
+            color: #4A90E2;
+        }
+
+        .suggestion-reason {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+
+        .suggestion-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .suggestion-btn {
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .suggestion-btn-apply {
+            background: #4A90E2;
+            color: #fff;
+        }
+
+        .suggestion-btn-dismiss {
+            background: #f5f5f5;
+            color: #999;
+        }
+
+        /* 引导页 */
+        .onboarding-page {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(180deg, #4A90E2 0%, #67B8DE 100%);
+            color: #fff;
+            text-align: center;
+            padding: 60px 32px;
+        }
+
+        .onboarding-icon {
+            font-size: 80px;
+            margin-bottom: 32px;
+        }
+
+        .onboarding-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .onboarding-desc {
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 40px;
+        }
+
+        .onboarding-btn {
+            background: #fff;
+            color: #4A90E2;
+            padding: 16px 48px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            margin-top: auto;
+        }
+
+        /* 场景列表 */
+        .scene-card {
+            background: #fff;
+            margin: 0 16px 12px;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .scene-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .scene-info {
+            flex: 1;
+        }
+
+        .scene-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        .scene-desc {
+            font-size: 13px;
+            color: #999;
+        }
+
+        .scene-count {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* 弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 20px;
+            padding: 24px;
+            width: calc(100% - 64px);
+            max-width: 340px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 25px;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+
+        .modal-btn-primary {
+            background: #4A90E2;
+            color: #fff;
+        }
+
+        .modal-btn-secondary {
+            background: #f5f5f5;
+            color: #666;
+        }
+
+        /* 页面切换动画 */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .page.active {
+            animation: slideIn 0.3s ease;
+        }
+
+        /* 导航tab图标 */
+        .nav-icon {
+            position: relative;
+        }
+
+        .badge {
+            position: absolute;
+            top: -4px;
+            right: -8px;
+            background: #E91E63;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        /* 浮动按钮 */
+        .fab {
+            position: absolute;
+            bottom: 90px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #4A90E2, #67B8DE);
+            color: #fff;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(74,144,226,0.4);
+            cursor: pointer;
+            border: none;
+        }
+
+        /* 意图识别提示 */
+        .intent-card {
+            background: #FFF3E0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin: 12px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .intent-icon {
+            font-size: 20px;
+        }
+
+        .intent-content {
+            flex: 1;
+        }
+
+        .intent-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #E65100;
+            margin-bottom: 4px;
+        }
+
+        .intent-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 32px;
+            color: #999;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-text {
+            font-size: 14px;
+        }
+
+        /* 副标题 */
+        .page-subtitle {
+            padding: 8px 16px 0;
+            font-size: 13px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span>9:41</span>
+            <span>📶 🔋</span>
+        </div>
+
+        <!-- 页面容器 -->
+        <div class="pages">
+            <!-- 首页 - 键盘主界面 -->
+            <div class="page active" id="page-home">
+                <div class="clipboard-area">
+                    <div class="clipboard-label">
+                        <span>📋</span> 已读取剪贴板
+                    </div>
+                    <div class="clipboard-content">
+                        "周六几点呀？去哪看呀？"
+                    </div>
+                </div>
+
+                <div class="page-subtitle">🎭 点击人设，AI自动生成回复</div>
+
+                <div class="section-title">日常</div>
+                <div class="persona-grid">
+                    <div class="persona-btn" onclick="selectPersona(this)">
+                        <div class="persona-name">to女朋友</div>
+                        <div class="persona-scene">【恋爱】</div>
+                    </div>
+                    <div class="persona-btn" onclick="selectPersona(this)">
+                        <div class="persona-name">to闺蜜</div>
+                        <div class="persona-scene">【八卦】</div>
+                    </div>
+                    <div class="persona-btn add-btn" onclick="showToast('跳转创建人设')">
+                        <div style="font-size:24px;color:#ccc;">+</div>
+                    </div>
+                </div>
+
+                <div class="section-title">职场</div>
+                <div class="persona-grid">
+                    <div class="persona-btn" onclick="selectPersona(this)">
+                        <div class="persona-name">to老板</div>
+                        <div class="persona-scene">【工作】</div>
+                    </div>
+                    <div class="persona-btn" onclick="selectPersona(this)">
+                        <div class="persona-name">to同事</div>
+                        <div class="persona-scene">【协作】</div>
+                    </div>
+                </div>
+
+                <div class="section-title">销售</div>
+                <div class="persona-grid">
+                    <div class="persona-btn" onclick="selectPersona(this)">
+                        <div class="persona-name">to客户A</div>
+                        <div class="persona-scene">【销售】</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" style="margin-top: 24px;" onclick="goToPage('page-result')">
+                    ⚡ 生成回复
+                </button>
+            </div>
+
+            <!-- 生成结果页 -->
+            <div class="page" id="page-result">
+                <div class="header">
+                    <div style="font-size:16px;">📋 已读取剪贴板</div>
+                    <div style="display:flex;gap:12px;">
+                        <span style="font-size:14px;color:#999;">⚙️</span>
+                        <span style="font-size:14px;color:#4A90E2;" onclick="goToPage('page-home')">🔄</span>
+                    </div>
+                </div>
+
+                <div class="clipboard-area" style="margin-top:0;border-radius:0 0 12px 12px;border-top:none;">
+                    <div class="clipboard-content">
+                        "周六几点呀？去哪看呀？"
+                    </div>
+                </div>
+
+                <!-- 意图识别提示 -->
+                <div class="intent-card">
+                    <div class="intent-icon">🧠</div>
+                    <div class="intent-content">
+                        <div class="intent-title">意图识别：询问时间地点</div>
+                        <div class="intent-desc">对方在确认周六的安排，建议回复中包含具体时间</div>
+                    </div>
+                </div>
+
+                <div class="page-subtitle">🎭 当前：to女朋友【恋爱】</div>
+
+                <div style="padding:0 16px;">
+                    <div class="tag tag-pink" style="margin-top:8px;">温柔8</div>
+                    <div class="tag tag-pink" style="margin-top:8px;">浪漫7</div>
+                    <div class="tag tag-pink" style="margin-top:8px;">调皮4</div>
+                </div>
+
+                <div class="section-title">▼ AI 为你生成 3 条回复</div>
+
+                <!-- 结果1 -->
+                <div class="result-card" onclick="selectResult(this)">
+                    <div class="result-header">
+                        <div class="result-type">
+                            <span class="result-badge">推荐</span>
+                            温柔浪漫型
+                        </div>
+                        <div class="result-actions">
+                            <div class="result-action">👍</div>
+                            <div class="result-action">👎</div>
+                            <div class="result-action">📋</div>
+                        </div>
+                    </div>
+                    <div class="result-content">
+                        "你想几点都可以呀~我都可以配合你！<br>最近有个新电影《封神》好像很火，<br>你想看这个吗？😊"
+                    </div>
+                    <div class="result-footer">
+                        <div class="result-btn result-btn-copy" onclick="event.stopPropagation();showToast('已复制')">📋 复制</div>
+                        <div class="result-btn result-btn-send" onclick="event.stopPropagation();showToast('发送成功')">🚀 发送</div>
+                    </div>
+                </div>
+
+                <!-- 结果2 -->
+                <div class="result-card" onclick="selectResult(this)">
+                    <div class="result-header">
+                        <div class="result-type">调皮主动型</div>
+                        <div class="result-actions">
+                            <div class="result-action">👍</div>
+                            <div class="result-action">👎</div>
+                            <div class="result-action">📋</div>
+                        </div>
+                    </div>
+                    <div class="result-content">
+                        "嘿嘿，你这么问我是不是说明你答应啦？<br>那就下午2点，xx影院，不许反悔哦~ 🎬"
+                    </div>
+                    <div class="result-footer">
+                        <div class="result-btn result-btn-copy" onclick="event.stopPropagation();showToast('已复制')">📋 复制</div>
+                        <div class="result-btn result-btn-send" onclick="event.stopPropagation();showToast('发送成功')">🚀 发送</div>
+                    </div>
+                </div>
+
+                <!-- 结果3 -->
+                <div class="result-card" onclick="selectResult(this)">
+                    <div class="result-header">
+                        <div class="result-type">简洁干练型</div>
+                        <div class="result-actions">
+                            <div class="result-action">👍</div>
+                            <div class="result-action">👎</div>
+                            <div class="result-action">📋</div>
+                        </div>
+                    </div>
+                    <div class="result-content">
+                        "下午2点，xx影院3号厅，<br>我买好票发你？"
+                    </div>
+                    <div class="result-footer">
+                        <div class="result-btn result-btn-copy" onclick="event.stopPropagation();showToast('已复制')">📋 复制</div>
+                        <div class="result-btn result-btn-send" onclick="event.stopPropagation();showToast('发送成功')">🚀 发送</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-block" onclick="goToPage('page-home')">
+                    🔄 重新生成
+                </button>
+            </div>
+
+            <!-- 人设列表页 -->
+            <div class="page" id="page-persona">
+                <div class="header">
+                    <div class="header-title">🎭 人设管理</div>
+                    <div style="font-size:16px;color:#4A90E2;" onclick="goToPage('page-create')">+ 新建</div>
+                </div>
+
+                <div class="section-title">职场 (2)</div>
+                <div class="persona-list-item">
+                    <div class="persona-list-header">
+                        <div class="persona-list-name">to老板</div>
+                        <span style="font-size:12px;color:#999;">使用23次</span>
+                    </div>
+                    <div class="persona-list-tags">
+                        <span class="tag tag-blue">干练 10</span>
+                        <span class="tag tag-blue">务实 9</span>
+                        <span class="tag tag-blue">成熟 8</span>
+                    </div>
+                    <div class="persona-list-scenes">
+                        <span class="scene-tag">【工作】</span>
+                        <span class="scene-tag">【日常】</span>
+                    </div>
+                </div>
+
+                <div class="persona-list-item">
+                    <div class="persona-list-header">
+                        <div class="persona-list-name">to同事</div>
+                        <span style="font-size:12px;color:#999;">使用15次</span>
+                    </div>
+                    <div class="persona-list-tags">
+                        <span class="tag tag-blue">配合 8</span>
+                        <span class="tag tag-blue">积极 7</span>
+                        <span class="tag tag-blue">亲和 6</span>
+                    </div>
+                    <div class="persona-list-scenes">
+                        <span class="scene-tag">【协作】</span>
+                    </div>
+                </div>
+
+                <div class="section-title">日常 (2)</div>
+                <div class="persona-list-item">
+                    <div class="persona-list-header">
+                        <div class="persona-list-name">to女朋友</div>
+                        <span style="font-size:12px;color:#E91E63;">❤️ 默认</span>
+                    </div>
+                    <div class="persona-list-tags">
+                        <span class="tag tag-pink">温柔 8</span>
+                        <span class="tag tag-pink">浪漫 7</span>
+                        <span class="tag tag-pink">调皮 4</span>
+                    </div>
+                    <div class="persona-list-scenes">
+                        <span class="scene-tag">【恋爱】</span>
+                        <span class="scene-tag">【吵架】</span>
+                        <span class="scene-tag">【日常】</span>
+                    </div>
+                </div>
+
+                <div class="persona-list-item">
+                    <div class="persona-list-header">
+                        <div class="persona-list-name">闺蜜</div>
+                        <span style="font-size:12px;color:#999;">使用34次</span>
+                    </div>
+                    <div class="persona-list-tags">
+                        <span class="tag tag-orange">调皮 8</span>
+                        <span class="tag tag-orange">幽默 7</span>
+                        <span class="tag tag-orange">仗义 6</span>
+                    </div>
+                    <div class="persona-list-scenes">
+                        <span class="scene-tag">【八卦】</span>
+                    </div>
+                </div>
+
+                <div class="section-title">销售 (1)</div>
+                <div class="persona-list-item">
+                    <div class="persona-list-header">
+                        <div class="persona-list-name">to客户A</div>
+                        <span style="font-size:12px;color:#999;">使用45次</span>
+                    </div>
+                    <div class="persona-list-tags">
+                        <span class="tag tag-green">热情 8</span>
+                        <span class="tag tag-green">专业 7</span>
+                        <span class="tag tag-green">主动 6</span>
+                    </div>
+                    <div class="persona-list-scenes">
+                        <span class="scene-tag">【销售】</span>
+                        <span class="scene-tag">【维护】</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 创建人设页 -->
+            <div class="page" id="page-create">
+                <div class="header">
+                    <div style="font-size:16px;" onclick="goToPage('page-persona')">← 返回</div>
+                    <div class="header-title">创建人设</div>
+                    <div style="font-size:16px;color:#4A90E2;">保存</div>
+                </div>
+
+                <div class="form-group" style="margin-top:20px;">
+                    <label class="form-label">名称</label>
+                    <input type="text" class="form-input" placeholder="例如：to老板">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">场景标签</label>
+                    <select class="form-select">
+                        <option>【工作】职场沟通</option>
+                        <option>【日常】日常聊天</option>
+                        <option>【恋爱】恋爱亲密</option>
+                        <option>【销售】销售咨询</option>
+                        <option>【客服】客服服务</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">关系类型</label>
+                    <select class="form-select">
+                        <option>上级</option>
+                        <option>同事</option>
+                        <option>恋人</option>
+                        <option>暧昧对象</option>
+                        <option>闺蜜/死党</option>
+                        <option>朋友</option>
+                        <option>客户</option>
+                    </select>
+                </div>
+
+                <div class="section-title" style="margin-top:8px;">性格标签 (已选 4/6)</div>
+
+                <div class="tag-grid">
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        干练 <span class="tag-level">10</span>
+                    </div>
+                    <div class="tag-select selected" onclick="toggleTag(this)">
+                        务实 <span class="tag-level">9</span> ✓
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        成熟 <span class="tag-level">8</span>
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        简洁 <span class="tag-level">7</span>
+                    </div>
+                    <div class="tag-select selected" onclick="toggleTag(this)">
+                        专业 <span class="tag-level">8</span> ✓
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        靠谱 <span class="tag-level">9</span>
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        严谨 <span class="tag-level">7</span>
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        自信 <span class="tag-level">6</span>
+                    </div>
+                    <div class="tag-select" onclick="toggleTag(this)">
+                        理性 <span class="tag-level">7</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary btn-block" onclick="showToast('+ 添加标签')">
+                    + 添加标签
+                </button>
+
+                <div class="card" style="margin-top:20px;">
+                    <div style="font-size:14px;color:#999;margin-bottom:8px;">预览效果</div>
+                    <div style="font-size:15px;font-weight:600;">to老板【工作】</div>
+                    <div style="font-size:13px;color:#666;margin-top:4px;">
+                        标签：务实9 专业8
+                    </div>
+                </div>
+            </div>
+
+            <!-- 上下文分析页 -->
+            <div class="page" id="page-context">
+                <div class="header">
+                    <div class="header-title">📋 上下文学习</div>
+                </div>
+
+                <div class="section-title">进行中</div>
+                <div class="card">
+                    <div class="analysis-header">
+                        <div class="analysis-avatar">💕</div>
+                        <div class="analysis-info">
+                            <div class="analysis-name">to女朋友 - 恋爱</div>
+                            <div class="analysis-meta">开始时间：今天 14:30 · 5轮对话</div>
+                        </div>
+                    </div>
+                    <div style="font-size:14px;color:#666;">
+                        最新消息："周末有什么安排呀？"
+                    </div>
+                </div>
+
+                <div class="section-title">历史批次</div>
+                <div class="card">
+                    <div class="analysis-header">
+                        <div class="analysis-avatar">💼</div>
+                        <div class="analysis-info">
+                            <div class="analysis-name">to老板 - 职场</div>
+                            <div class="analysis-meta">2026-02-16 · 8轮对话</div>
+                        </div>
+                    </div>
+                    <div style="font-size:13px;color:#999;margin-top:8px;">
+                        摘要：工作汇报相关 · 4条回复生成
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="analysis-header">
+                        <div class="analysis-avatar">📈</div>
+                        <div class="analysis-info">
+                            <div class="analysis-name">to客户A - 销售</div>
+                            <div class="analysis-meta">2026-02-15 · 12轮对话</div>
+                        </div>
+                    </div>
+                    <div style="font-size:13px;color:#999;margin-top:8px;">
+                        摘要：产品咨询、讨价还价 · 7条回复生成
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block" onclick="goToPage('page-analysis')">
+                    🧠 AI分析报告
+                </button>
+            </div>
+
+            <!-- AI分析报告页 -->
+            <div class="page" id="page-analysis">
+                <div class="header">
+                    <div style="font-size:16px;" onclick="goToPage('page-context')">← 返回</div>
+                    <div class="header-title">🧠 AI性格分析</div>
+                    <div style="font-size:14px;color:#999;">📤</div>
+                </div>
+
+                <div class="card" style="margin:16px;">
+                    <div style="font-size:14px;font-weight:600;margin-bottom:8px;">分析对象：to女朋友 - 恋爱</div>
+                    <div style="font-size:12px;color:#999;">分析周期：2026-02-10 ~ 2026-02-16（7天）</div>
+                </div>
+
+                <div class="section-title">📊 对方回复风格变化</div>
+                <div class="card">
+                    <div class="trend-item">
+                        <div class="trend-day">Day 1</div>
+                        <div class="trend-content">"好呀~"</div>
+                        <div class="trend-emoji">😊</div>
+                    </div>
+                    <div class="trend-item">
+                        <div class="trend-day">Day 3</div>
+                        <div class="trend-content">"好"</div>
+                        <div class="trend-emoji">😐</div>
+                    </div>
+                    <div class="trend-item">
+                        <div class="trend-day">Day 5</div>
+                        <div class="trend-content">"随便"</div>
+                        <div class="trend-emoji">😔</div>
+                    </div>
+                    <div class="trend-item">
+                        <div class="trend-day">Day 7</div>
+                        <div class="trend-content">"嗯"</div>
+                        <div class="trend-emoji">😒</div>
+                    </div>
+                </div>
+
+                <div class="card" style="background:#FCE8F0;">
+                    <div style="font-size:14px;font-weight:600;color:#E91E63;margin-bottom:8px;">🔍 AI 判断</div>
+                    <div style="font-size:13px;color:#666;">
+                        对方近期回复风格明显变化：<br>
+                        • 回复长度缩短<br>
+                        • 语气词消失<br>
+                        • 响应间隔变长<br><br>
+                        可能原因：较忙/心情不好/对你冷淡
+                    </div>
+                </div>
+
+                <div class="section-title">⚖️ 标签权重调整建议</div>
+
+                <div class="suggestion-card">
+                    <div class="suggestion-header">
+                        💡 AI 建议
+                    </div>
+
+                    <div class="suggestion-item">
+                        <div class="suggestion-info">
+                            <div class="suggestion-tag">温柔：7 → 8</div>
+                            <div class="suggestion-reason">对方需要更多关心</div>
+                        </div>
+                        <div class="suggestion-actions">
+                            <div class="suggestion-btn suggestion-btn-apply" onclick="showToast('已应用')">应用</div>
+                            <div class="suggestion-btn suggestion-btn-dismiss">忽略</div>
+                        </div>
+                    </div>
+
+                    <div class="suggestion-item">
+                        <div class="suggestion-info">
+                            <div class="suggestion-tag">幽默：5 → 3</div>
+                            <div class="suggestion-reason">此时不宜开玩笑</div>
+                        </div>
+                        <div class="suggestion-actions">
+                            <div class="suggestion-btn suggestion-btn-apply" onclick="showToast('已应用')">应用</div>
+                            <div class="suggestion-btn suggestion-btn-dismiss">忽略</div>
+                        </div>
+                    </div>
+
+                    <div class="suggestion-item">
+                        <div class="suggestion-info">
+                            <div class="suggestion-tag">浪漫：4 → 5</div>
+                            <div class="suggestion-reason">需要表达在乎</div>
+                        </div>
+                        <div class="suggestion-actions">
+                            <div class="suggestion-btn suggestion-btn-apply" onclick="showToast('已应用')">应用</div>
+                            <div class="suggestion-btn suggestion-btn-dismiss">忽略</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-block">
+                    应用全部建议
+                </button>
+            </div>
+
+            <!-- 场景列表页 -->
+            <div class="page" id="page-scene">
+                <div class="header">
+                    <div class="header-title">🎯 场景管理</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#E8F5E9;">💬</div>
+                    <div class="scene-info">
+                        <div class="scene-name">日常聊天</div>
+                        <div class="scene-desc">朋友、家人间的日常沟通</div>
+                    </div>
+                    <div class="scene-count">156次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#E3F2FD;">💼</div>
+                    <div class="scene-info">
+                        <div class="scene-name">职场沟通</div>
+                        <div class="scene-desc">工作场景的专业沟通</div>
+                    </div>
+                    <div class="scene-count">89次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#FFF3E0;">📈</div>
+                    <div class="scene-info">
+                        <div class="scene-name">销售咨询</div>
+                        <div class="scene-desc">商业咨询、客户跟进</div>
+                    </div>
+                    <div class="scene-count">67次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#F3E5F5;">🎧</div>
+                    <div class="scene-info">
+                        <div class="scene-name">客服服务</div>
+                        <div class="scene-desc">客户咨询、问题处理</div>
+                    </div>
+                    <div class="scene-count">34次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#FCE8F0;">💕</div>
+                    <div class="scene-info">
+                        <div class="scene-name">恋爱亲密</div>
+                        <div class="scene-desc">追求期、甜蜜期、暧昧期</div>
+                    </div>
+                    <div class="scene-count">203次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#E0F7FA;">✨</div>
+                    <div class="scene-info">
+                        <div class="scene-name">社交破冰</div>
+                        <div class="scene-desc">新认识的人开启对话</div>
+                    </div>
+                    <div class="scene-count">12次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#EFEBE9;">🤝</div>
+                    <div class="scene-info">
+                        <div class="scene-name">道歉和解</div>
+                        <div class="scene-desc">矛盾、道歉、求和</div>
+                    </div>
+                    <div class="scene-count">8次</div>
+                </div>
+
+                <div class="scene-card">
+                    <div class="scene-icon" style="background:#FFEBEE;">🎉</div>
+                    <div class="scene-info">
+                        <div class="scene-name">节日问候</div>
+                        <div class="scene-desc">逢年过节的祝福</div>
+                    </div>
+                    <div class="scene-count">5次</div>
+                </div>
+            </div>
+
+            <!-- 设置页 -->
+            <div class="page" id="page-settings">
+                <div class="header">
+                    <div class="header-title">⚙️ 设置</div>
+                </div>
+
+                <div class="section-title">账号</div>
+                <div class="card">
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>账号状态</span>
+                        <span style="color:#999;">未登录 →</span>
+                    </div>
+                    <div style="padding:12px 0;display:flex;justify-content:space-between;align-items:center;">
+                        <span>会员状态</span>
+                        <span style="color:#E91E63;">免费试用</span>
+                    </div>
+                </div>
+
+                <div class="section-title">功能设置</div>
+                <div class="card">
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>🎭 AI智能调整</span>
+                        <span style="color:#4CAF50;">已开启</span>
+                    </div>
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>📋 自动保存上下文</span>
+                        <span style="color:#4CAF50;">已开启</span>
+                    </div>
+                    <div style="padding:12px 0;display:flex;justify-content:space-between;align-items:center;">
+                        <span>🔔 意图识别提醒</span>
+                        <span style="color:#4CAF50;">已开启</span>
+                    </div>
+                </div>
+
+                <div class="section-title">键盘设置</div>
+                <div class="card">
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>启用键盘</span>
+                        <span style="color:#4A90E2;">已开启 →</span>
+                    </div>
+                    <div style="padding:12px 0;display:flex;justify-content:space-between;align-items:center;">
+                        <span>键盘主题</span>
+                        <span style="color:#999;">默认 →</span>
+                    </div>
+                </div>
+
+                <div class="section-title">其他</div>
+                <div class="card">
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>📖 使用帮助</span>
+                        <span style="color:#999;">→</span>
+                    </div>
+                    <div style="padding:12px 0;border-bottom:1px solid #f5f5f5;display:flex;justify-content:space-between;align-items:center;">
+                        <span>💬 意见反馈</span>
+                        <span style="color:#999;">→</span>
+                    </div>
+                    <div style="padding:12px 0;display:flex;justify-content:space-between;align-items:center;">
+                        <span>⭐ 给我们评分</span>
+                        <span style="color:#999;">→</span>
+                    </div>
+                </div>
+
+                <div style="text-align:center;margin-top:32px;margin-bottom:40px;">
+                    <div style="font-size:12px;color:#ccc;">聊商 v1.0.0</div>
+                </div>
+            </div>
+
+            <!-- 引导页 -->
+            <div class="page" id="page-onboarding" style="padding:0;">
+                <div class="onboarding-page">
+                    <div class="onboarding-icon">🎭</div>
+                    <div class="onboarding-title">聊商</div>
+                    <div class="onboarding-desc">
+                        AI 帮你聊得更得体<br>
+                        一键生成回复，让沟通更轻松
+                    </div>
+                    <button class="onboarding-btn" onclick="showOnboarding2()">
+                        开始体验
+                    </button>
+                </div>
+            </div>
+
+            <!-- 引导页2 -->
+            <div class="page" id="page-onboarding2" style="padding:0;">
+                <div class="onboarding-page">
+                    <div class="onboarding-icon">👤</div>
+                    <div class="onboarding-title">创建人设</div>
+                    <div class="onboarding-desc">
+                        设置你想扮演的角色<br>
+                        老板、女朋友、闺蜜、客户...
+                    </div>
+                    <button class="onboarding-btn" onclick="showOnboarding3()">
+                        下一步
+                    </button>
+                </div>
+            </div>
+
+            <!-- 引导页3 -->
+            <div class="page" id="page-onboarding3" style="padding:0;">
+                <div class="onboarding-page">
+                    <div class="onboarding-icon">⚡</div>
+                    <div class="onboarding-title">一键生成</div>
+                    <div class="onboarding-desc">
+                        复制消息 → 点击人设 → AI生成<br>
+                        选择回复 → 复制发送
+                    </div>
+                    <button class="onboarding-btn" onclick="goToPage('page-home')">
+                        立即体验
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="tab-bar">
+            <div class="tab-item active" onclick="switchTab(this, 'page-home')">
+                <div class="icon">💬</div>
+                <div>对话</div>
+            </div>
+            <div class="tab-item" onclick="switchTab(this, 'page-persona')">
+                <div class="icon">👤</div>
+                <div>人设</div>
+            </div>
+            <div class="tab-item" onclick="switchTab(this, 'page-context')">
+                <div class="nav-icon">
+                    <div class="icon">📋</div>
+                </div>
+                <div>学习</div>
+            </div>
+            <div class="tab-item" onclick="switchTab(this, 'page-scene')">
+                <div class="icon">🎯</div>
+                <div>场景</div>
+            </div>
+            <div class="tab-item" onclick="switchTab(this, 'page-settings')">
+                <div class="icon">⚙️</div>
+                <div>设置</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast" style="position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);color:#fff;padding:12px 24px;border-radius:25px;font-size:14px;display:none;z-index:200;">
+        已复制
+    </div>
+
+    <script>
+        // 页面切换
+        function goToPage(pageId) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        // Tab 切换
+        function switchTab(el, pageId) {
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            goToPage(pageId);
+        }
+
+        // 人设按钮选择
+        function selectPersona(el) {
+            document.querySelectorAll('.persona-btn').forEach(b => b.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 结果选择
+        function selectResult(el) {
+            document.querySelectorAll('.result-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+        }
+
+        // 标签切换
+        function toggleTag(el) {
+            el.classList.toggle('selected');
+        }
+
+        // Toast 提示
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+
+        // 引导页
+        function showOnboarding2() {
+            goToPage('page-onboarding2');
+        }
+
+        function showOnboarding3() {
+            goToPage('page-onboarding3');
+        }
+
+        // 初始化显示首页
+        // goToPage('page-onboarding');
+    </script>
+</body>
+</html>

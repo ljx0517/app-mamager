@@ -39,7 +39,6 @@ export default function AdminLayout() {
 
   // 处理 API 返回的数据
   useEffect(() => {
-    console.log('[AdminLayout] appsData:', appsData, 'error:', appsError)
     if (appsData && Array.isArray(appsData)) {
       const appList: AppInfo[] = appsData.map((app) => ({
         id: app.id,
@@ -53,17 +52,9 @@ export default function AdminLayout() {
         createdAt: app.createdAt?.toString() || new Date().toISOString(),
         updatedAt: app.updatedAt?.toString() || new Date().toISOString(),
       }))
-      console.log('[AdminLayout] 转换后的 appList:', appList)
       setApps(appList)
     }
-  }, [appsData, appsError, setApps])
-
-  // 调试：打印错误（使用 useEffect 避免每次渲染都执行）
-  useEffect(() => {
-    if (appsError) {
-      console.error('获取应用列表失败:', appsError)
-    }
-  }, [appsError])
+  }, [appsData, setApps])
 
   // 判断当前是否在某个 App 的管理页面
   const isInAppPage = currentAppId && apps.some((app) => app.id === currentAppId)
@@ -315,6 +306,14 @@ export default function AdminLayout() {
           </Space>
 
           <Space size="middle">
+            {/* 应用管理按钮 */}
+            <Button
+              type="text"
+              icon={<AppstoreOutlined />}
+              onClick={() => navigate('/apps')}
+            >
+              应用管理
+            </Button>
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <Space className="cursor-pointer" size="small">
                 <Avatar
