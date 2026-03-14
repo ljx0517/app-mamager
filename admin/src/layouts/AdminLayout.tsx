@@ -1,12 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Outlet, useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Layout, Menu, Avatar, Dropdown, theme, Button, Space, Divider, Spin } from 'antd'
+import { Layout, Menu, Avatar, Dropdown, theme, Button, Space, Divider, Spin, Tag, Typography } from 'antd'
 import {
-  DashboardOutlined,
   UserOutlined,
-  CrownOutlined,
-  BarChartOutlined,
-  SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -18,7 +14,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
 import { trpc } from '@/utils/trpc'
 import { PLATFORM_NAME } from '@/utils/constants'
-import { getRegisteredTemplates } from '@/config/appRegistry'
 import type { AppInfo } from '@/types'
 
 const { Header, Sider, Content } = Layout
@@ -56,65 +51,22 @@ export default function AdminLayout() {
     }
   }, [appsData, setApps])
 
-  // 判断当前是否在某个 App 的管理页面
-  const isInAppPage = currentAppId && apps.some((app) => app.id === currentAppId)
-
-  // 当前 App 的详情菜单
-  const appDetailMenuItems = useMemo(() => {
-    if (!currentApp) return []
-
-    const items: { key: string; icon: React.ReactNode; label: string }[] = [
-      {
-        key: `/${currentApp.id}/dashboard`,
-        icon: <DashboardOutlined />,
-        label: '仪表盘',
-      },
-      {
-        key: `/${currentApp.id}/users`,
-        icon: <UserOutlined />,
-        label: '用户管理',
-      },
-      {
-        key: `/${currentApp.id}/subscriptions`,
-        icon: <CrownOutlined />,
-        label: '订阅管理',
-      },
-      {
-        key: `/${currentApp.id}/analytics`,
-        icon: <BarChartOutlined />,
-        label: '数据分析',
-      },
-    ]
-
-    // 如果当前 App 有配置模板，添加配置模板菜单项
-    if (currentApp.configTemplate) {
-      const templates = getRegisteredTemplates()
-      const template = templates.find((t) => t.id === currentApp.configTemplate)
-      if (template) {
-        items.push({
-          key: `/${currentApp.id}/settings/${template.id}`,
-          icon: <SettingOutlined />,
-          label: template.displayName,
-        })
-      }
-    } else {
-      // 默认应用设置
-      items.push({
-        key: `/${currentApp.id}/settings`,
-        icon: <SettingOutlined />,
-        label: '应用设置',
-      })
-    }
-
-    return items
-  }, [currentApp])
-
-  // App 列表菜单
+  // App 列表菜单 - 始终显示，带状态标签
   const appListMenuItems = useMemo(() => {
     return apps.map((app) => ({
       key: `/${app.id}/dashboard`,
       icon: <MobileOutlined />,
-      label: app.name,
+      label: (
+        <div className="flex items-center justify-between w-full" style={{ padding: '4px 0' }}>
+          <span>{app.icon} {app.name}</span>
+          <Tag
+            color={app.status === 'active' ? 'green' : 'default'}
+            style={{ marginRight: 0, fontSize: 11 }}
+          >
+            {app.status === 'active' ? '运行中' : '已停用'}
+          </Tag>
+        </div>
+      ),
     }))
   }, [apps])
 
@@ -130,18 +82,18 @@ export default function AdminLayout() {
   // 当前选中的菜单 key
   const selectedKeys = useMemo(() => {
     const path = location.pathname
-    // 匹配 App 管理页面
-    if (apps.some((app) => path.startsWith(`/${app.id}/`))) {
-      return [path]
+    // 匹配 /:appId/* 路径
+    if (path.match(/^\/[^/]+\/.*/)) {
+      const parts = path.split('/')
+      if (parts.length >= 2) {
+        return [`/${parts[1]}/dashboard`]
+      }
     }
     if (path === '/apps') {
       return ['/apps']
     }
     return []
-  }, [location.pathname, apps])
-
-  // 当前显示的菜单（App 详情菜单或 App 列表菜单）
-  const currentMenuItems = isInAppPage ? appDetailMenuItems : appListMenuItems
+  }, [location.pathname])
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -217,29 +169,29 @@ export default function AdminLayout() {
           </div>
         )}
 
-        {/* 返回 App 列表按钮（仅在 App 详情页显示） */}
-        {isInAppPage && currentApp && !collapsed && (
-          <div
-            className="px-4 py-2 flex items-center gap-2 cursor-pointer hover:opacity-80"
-            style={{ color: themeToken.colorPrimary }}
-            onClick={() => navigate('/apps')}
-          >
-            <span>← 返回应用列表</span>
-          </div>
-        )}
-
-        {/* 当前菜单（App 详情菜单或 App 列表菜单） */}
+        {/* App 列表菜单 - 始终显示 */}
         {!appsLoading && apps.length > 0 && (
           <Menu
             mode="inline"
             selectedKeys={selectedKeys}
-            items={currentMenuItems}
+            items={appListMenuItems}
             onClick={handleMenuClick}
             style={{
               border: 'none',
               padding: '4px 0',
             }}
           />
+        )}
+
+        {/* 无 App 时的提示 */}
+        {!appsLoading && apps.length === 0 && (
+          <div className="px-4 py-8 text-center">
+            <Typography.Text type="secondary">暂无应用</Typography.Text>
+            <br />
+            <Button type="link" onClick={() => navigate('/apps')}>
+              前往创建
+            </Button>
+          </div>
         )}
 
         <Divider style={{ margin: '4px 16px', minWidth: 'auto', width: 'auto' }} />
