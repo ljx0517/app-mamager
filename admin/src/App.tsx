@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useEffect } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
-import { trpc } from '@/utils/trpc'
 import AdminLayout from '@/layouts/AdminLayout'
 import LoginPage from '@/pages/Login'
 import DashboardPage from '@/pages/Dashboard'
