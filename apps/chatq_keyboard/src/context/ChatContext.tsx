@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { Platform, Linking } from 'react-native';
+import { Platform } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { AppState, AppAction, Conversation, ChatMessage } from '../types';
 import * as storage from '../services/storage';
 import * as api from '../services/api';
+import * as configDataService from '../services/configData';
 import { communicationService } from '../services/communication';
-import { KeyboardRequest, KeyboardResponse } from '../types/communication';
 
 const initialState: AppState = {
   conversations: [],
@@ -16,7 +16,9 @@ const initialState: AppState = {
     clipboardContent: '',
     isGenerating: false,
     currentReply: null,
+    currentCandidates: null,
   },
+  configData: null,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -63,6 +65,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         keyboard: { ...state.keyboard, currentReply: action.payload },
       };
 
+    case 'SET_CURRENT_CANDIDATES':
+      return {
+        ...state,
+        keyboard: { ...state.keyboard, currentCandidates: action.payload },
+      };
+
+    case 'SET_CONFIG_DATA':
+      return { ...state, configData: action.payload };
+
     default:
       return state;
   }
@@ -79,6 +90,8 @@ interface ChatContextType {
   // 键盘扩展相关
   handleKeyboardRequest: (requestId: string, content: string) => Promise<void>;
   sendKeyboardResponse: (requestId: string, reply: string, success?: boolean, error?: string) => Promise<void>;
+  /** 刷新主数据（场景/关系/标签/人设包） */
+  loadConfigData: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | null>(null);
@@ -86,9 +99,18 @@ const ChatContext = createContext<ChatContextType | null>(null);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // 初始化加载对话列表
+  // 初始化加载对话列表与主数据（场景/关系/标签/人设包）
   useEffect(() => {
     loadConversations();
+  }, []);
+
+  const loadConfigData = async () => {
+    const data = await configDataService.getConfigData();
+    if (data) dispatch({ type: 'SET_CONFIG_DATA', payload: data });
+  };
+
+  useEffect(() => {
+    loadConfigData();
   }, []);
 
   const loadConversations = async () => {
@@ -148,8 +170,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // 添加用户消息
       await addMessage('user', content);
 
-      // 生成AI回复
-      const apiResponse = await api.generateReply({ content });
+      // 生成AI回复（支持多候选）
+      const apiResponse = await api.generateReply({
+        content,
+        candidateCount: 3,
+      });
 
       // 添加AI回复
       await addMessage('assistant', apiResponse.reply);
@@ -159,6 +184,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       dispatch({ type: 'SET_GENERATING', payload: false });
       dispatch({ type: 'SET_CURRENT_REPLY', payload: apiResponse.reply });
+      dispatch({
+        type: 'SET_CURRENT_CANDIDATES',
+        payload: apiResponse.candidates?.length ? apiResponse.candidates : null,
+      });
     } catch (error) {
       console.error('处理键盘请求失败:', error);
       await sendKeyboardResponse(requestId, '', false, error.message);
@@ -228,6 +257,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         deleteConversation,
         handleKeyboardRequest,
         sendKeyboardResponse,
+        loadConfigData,
       }}
     >
       {children}
