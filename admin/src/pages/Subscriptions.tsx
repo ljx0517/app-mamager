@@ -103,7 +103,9 @@ export default function SubscriptionsPage() {
   )
 
   // 组合加载状态
-  const { isLoading: smartLoading } = useSmartLoading(isLoadingSubs || isLoadingStats)
+  const smartLoading = useSmartLoading({
+    manualStates: [isLoadingSubs || isLoadingStats],
+  })
   const loading = smartLoading || manualLoading
 
   // 转换后端数据到前端格式
@@ -309,7 +311,7 @@ export default function SubscriptionsPage() {
         ) : (
           <Table
             dataSource={filteredData}
-            columns={columns}
+            columns={columns as never}
             rowKey="id"
             loading={manualLoading}
             pagination={{

@@ -11,7 +11,6 @@ import {
   Descriptions,
   Empty,
   message,
-  Spin,
 } from 'antd'
 import {
   SearchOutlined,
@@ -94,7 +93,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: PAGE_SIZE_OPTIONS[0],
@@ -157,7 +156,7 @@ export default function UsersPage() {
     }
 
     const searchLower = searchText.toLowerCase()
-    return apiUsers.filter((user) =>
+    return apiUsers.filter((user: User) =>
       user.deviceId.toLowerCase().includes(searchLower)
     )
   }, [apiUsers, searchText])

@@ -1,4 +1,4 @@
-import { Card, Row, Col, Tag, Button, Empty, Statistic, theme } from 'antd'
+import { Card, Row, Col, Tag, Button, Empty, Statistic } from 'antd'
 import {
   RightOutlined,
   AppstoreOutlined,
@@ -35,14 +35,11 @@ export default function DashboardPage() {
 
       {apps.length === 0 ? (
         <Card style={{ borderRadius: 12 }}>
-          <Empty
-            description="暂无应用"
-            extra={
-              <Button type="primary" onClick={() => navigate('/apps')}>
-                前往创建应用
-              </Button>
-            }
-          />
+          <Empty description="暂无应用">
+            <Button type="primary" onClick={() => navigate('/apps')}>
+              前往创建应用
+            </Button>
+          </Empty>
         </Card>
       ) : (
         <Row gutter={[16, 16]}>
@@ -132,8 +129,8 @@ function DashboardView() {
     { enabled: !!currentAppId, refetchOnWindowFocus: false }
   )
 
-  // tRPC 查询 - 最近注册用户
-  const usersQuery = trpc.userManage.list.useQuery(
+  // tRPC 查询 - 最近注册用户（预留，可用于展示）
+  trpc.userManage.list.useQuery(
     {
       appId: currentAppId!,
       limit: 5,
@@ -147,7 +144,7 @@ function DashboardView() {
   if (!currentApp) return null
 
   const snapshot = snapshotQuery.data
-  const stats = statsQuery.data
+  void statsQuery.data // 预留用于统计展示
 
   return (
     <div>

@@ -140,27 +140,25 @@ export default function AnalyticsPage() {
 
   // 从 API 数据构建展示数据
   const usageData = usageQuery.data
-  const revenueData = revenueQuery.data
 
   // 汇总指标
   const summary = usageData?.summary
   const timeSeries = usageData?.timeSeries || []
 
-  // 模拟热门接口数据（从 distribution 获取）
-  const topEndpoints = usageData?.distribution?.popularStyles?.slice(0, 5).map((item, index) => ({
+  const distribution = usageData?.distribution as { popularStyles?: Array<{ name?: string; styleId?: string }> } | undefined
+  const topEndpoints = (distribution?.popularStyles?.slice(0, 5) ?? []).map((item, index) => ({
     key: String(index + 1),
-    endpoint: item.name || item.styleId,
+    endpoint: item.name || item.styleId || '',
     calls: Math.floor(Math.random() * 10000) + 1000,
     avgMs: Math.floor(Math.random() * 300) + 100,
     errorRate: Number((Math.random() * 3).toFixed(2)),
-  })) || []
+  }))
 
-  // 每日趋势
-  const dailyTrend = timeSeries.map((item, index) => ({
+  const dailyTrend = timeSeries.map((item: { timePeriod?: unknown; totalReplies?: number; failedCalls?: number }, index: number) => ({
     key: String(index + 1),
-    date: dayjs(item.timePeriod).format('MM-DD'),
-    calls: item.totalReplies,
-    errors: item.failedCalls,
+    date: dayjs(item.timePeriod as string).format('MM-DD'),
+    calls: item.totalReplies ?? 0,
+    errors: item.failedCalls ?? 0,
   }))
 
   return (
