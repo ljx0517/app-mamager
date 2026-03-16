@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { router, adminProcedure } from "../trpc/index.js";
 import { apps, type AppSettings, type AIProviderConfig, type AIProviderType } from "../db/schema.js";
 import { TRPCError } from "@trpc/server";
@@ -207,6 +207,7 @@ export const settingsRouter = router({
       return {
         appId: app.id,
         appName: app.name,
+        bundleId: app.bundleId,
         settings: app.settings,
         platform: app.platform,
         isActive: app.isActive,
@@ -220,39 +221,57 @@ export const settingsRouter = router({
    */
   updateApp: adminProcedure
     .input(
-      z.object({
-        appId: z.string().uuid(),
-        /** 基础配置 */
-        freeReplyLimitPerDay: z.number().int().min(0).max(1000).optional(),
-        freeCandidateCount: z.number().int().min(1).max(10).optional(),
-        proCandidateCount: z.number().int().min(1).max(20).optional(),
-        enableAI: z.boolean().optional(),
-        enableSubscription: z.boolean().optional(),
-        /** AI 提供商配置 */
-        aiProviders: z
-          .array(
-            z.object({
-              type: z.enum(["openai", "anthropic", "google", "mock", "azure_openai", "unknown"]),
-              apiKey: z.string().optional(),
-              baseUrl: z.string().url().optional(),
-              model: z.string().optional(),
-              enabled: z.boolean(),
-              priority: z.number().int().min(0).max(1000),
-              retryCount: z.number().int().min(0).max(5).optional(),
-              timeout: z.number().int().min(1000).max(30000).optional(),
-            })
-          )
-          .optional(),
-        defaultAIProvider: z.string().optional(),
-        /** 自定义功能开关 */
-        customFeatures: z
-          .record(z.unknown())
-          .optional()
-          .describe("应用自定义功能配置，支持任意扩展字段"),
-      })
+      z
+        .object({
+          appId: z.string().uuid(),
+          /** 基础配置 */
+          freeReplyLimitPerDay: z.number().int().min(0).max(1000).optional(),
+          freeCandidateCount: z.number().int().min(1).max(10).optional(),
+          proCandidateCount: z.number().int().min(1).max(20).optional(),
+          enableAI: z.boolean().optional(),
+          enableSubscription: z.boolean().optional(),
+          /** AI 提供商配置 */
+          aiProviders: z
+            .array(
+              z.object({
+                type: z.enum(["openai", "anthropic", "google", "mock", "azure_openai", "unknown"]),
+                apiKey: z.string().optional(),
+                baseUrl: z.string().url().optional(),
+                model: z.string().optional(),
+                enabled: z.boolean(),
+                priority: z.number().int().min(0).max(1000),
+                retryCount: z.number().int().min(0).max(5).optional(),
+                timeout: z.number().int().min(1000).max(30000).optional(),
+              })
+            )
+            .optional(),
+          defaultAIProvider: z.string().optional(),
+          /** 自定义功能开关（模板页专属配置可放此处或顶层，顶层未声明键会通过 passthrough 传入） */
+          customFeatures: z
+            .record(z.unknown())
+            .optional()
+            .describe("应用自定义功能配置，支持任意扩展字段"),
+        })
+        .passthrough()
     )
     .mutation(async ({ ctx, input }) => {
       const { appId, ...configUpdates } = input;
+
+      // 已知顶层字段，仅这些参与显式合并；其余键（模板自定义）归入 customUpdates 一并写入 settings
+      const knownTopLevelKeys = [
+        "freeReplyLimitPerDay",
+        "freeCandidateCount",
+        "proCandidateCount",
+        "enableAI",
+        "enableSubscription",
+        "aiProviders",
+        "defaultAIProvider",
+        "customFeatures",
+      ];
+      const customUpdates: Record<string, unknown> = {};
+      for (const k of Object.keys(configUpdates)) {
+        if (!knownTopLevelKeys.includes(k)) customUpdates[k] = (configUpdates as Record<string, unknown>)[k];
+      }
 
       // 验证应用存在
       const [app] = await ctx.db
@@ -305,6 +324,7 @@ export const settingsRouter = router({
           defaultAIProvider: configUpdates.defaultAIProvider as AIProviderType,
         }),
         ...(configUpdates.customFeatures !== undefined && configUpdates.customFeatures),
+        ...customUpdates,
       };
 
       // 更新数据库
@@ -530,7 +550,11 @@ export const settingsRouter = router({
         .from(apps)
         .orderBy(apps.createdAt);
 
-      return allApps.map((app) => ({
+      return allApps.map((app: {
+        id: string; name: string; platform: string; isActive: boolean;
+        settings?: { enableAI?: boolean; enableSubscription?: boolean; aiProviders?: unknown[] } | null;
+        userCount?: unknown; subscriptionCount?: unknown;
+      }) => ({
         id: app.id,
         name: app.name,
         platform: app.platform,
@@ -541,7 +565,7 @@ export const settingsRouter = router({
         features: {
           aiEnabled: app.settings?.enableAI ?? false,
           subscriptionEnabled: app.settings?.enableSubscription ?? false,
-          hasCustomAIProviders: Array.isArray(app.settings?.aiProviders) && app.settings.aiProviders.length > 0,
+          hasCustomAIProviders: Array.isArray(app.settings?.aiProviders) && (app.settings.aiProviders?.length ?? 0) > 0,
         },
       }));
     }),

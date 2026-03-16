@@ -350,3 +350,220 @@ export type NewStyle = typeof styles.$inferInsert;
 
 export type UsageRecord = typeof usageRecords.$inferSelect;
 export type NewUsageRecord = typeof usageRecords.$inferInsert;
+
+// ==================== ChatQ 专用表 ====================
+
+/** 用户关键词表 - 存储用户的关键词-回复映射 */
+export const userKeywords = pgTable(
+  "user_keywords",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    appId: uuid("app_id")
+      .references(() => apps.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    deviceId: varchar("device_id", { length: 255 }).notNull(),
+    keyword: varchar("keyword", { length: 50 }).notNull(),
+    reply: varchar("reply", { length: 500 }).notNull(),
+    matchType: varchar("match_type", { length: 20 }).default("exact"), // exact | fuzzy
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("keywords_app_device_idx").on(table.appId, table.deviceId),
+    index("keywords_keyword_idx").on(table.keyword),
+  ]
+);
+
+/** 用户短语表 - 存储用户保存的常用短语 */
+export const userPhrases = pgTable(
+  "user_phrases",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    appId: uuid("app_id")
+      .references(() => apps.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    deviceId: varchar("device_id", { length: 255 }).notNull(),
+    phrase: varchar("phrase", { length: 500 }).notNull(),
+    label: varchar("label", { length: 50 }),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("phrases_app_device_idx").on(table.appId, table.deviceId),
+  ]
+);
+
+// ==================== 配置模板表 ====================
+
+/** 配置模板表 - 存储应用配置模板 */
+export const configTemplates = pgTable("config_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  /** 模板唯一标识（如 ai-keyboard, ai-writer） */
+  templateId: varchar("template_id", { length: 100 }).notNull().unique(),
+  /** 模板显示名称 */
+  displayName: varchar("display_name", { length: 100 }).notNull(),
+  /** 模板图标 */
+  icon: varchar("icon", { length: 10 }).default("📦"),
+  /** 模板描述 */
+  description: text("description"),
+  /** 前端组件路径（用于动态加载） */
+  componentPath: varchar("component_path", { length: 255 }).notNull(),
+  /** 默认配置 JSON */
+  defaultConfig: jsonb("default_config").$type<Record<string, unknown>>(),
+  /** 是否为内置模板（内置模板不可删除） */
+  isBuiltin: boolean("is_builtin").default(false).notNull(),
+  /** 是否启用 */
+  isActive: boolean("is_active").default(true).notNull(),
+  /** 排序权重 */
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export type ConfigTemplate = typeof configTemplates.$inferSelect;
+export type NewConfigTemplate = typeof configTemplates.$inferInsert;
+
+export type UserKeyword = typeof userKeywords.$inferSelect;
+export type NewUserKeyword = typeof userKeywords.$inferInsert;
+
+export type UserPhrase = typeof userPhrases.$inferSelect;
+export type NewUserPhrase = typeof userPhrases.$inferInsert;
+
+// ==================== ChatQ 主数据表（admin 可管理，客户端只读） ====================
+
+/** 标签情感倾向 */
+export const personaTagSentimentEnum = pgEnum("chatq_persona_tag_sentiment", [
+  "positive",
+  "neutral",
+  "negative",
+]);
+
+/** 人设包性别 */
+export const personaPackageGenderEnum = pgEnum("chatq_persona_package_gender", [
+  "male",
+  "female",
+  "any",
+]);
+
+/** ChatQ 维度表 - 人设标签的维度（性格特质、语言风格等） */
+export const chatqDimensions = pgTable("chatq_dimensions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  dimensionId: varchar("dimension_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  sort: integer("sort").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/** ChatQ 人设标签表 */
+export const chatqPersonaTags = pgTable(
+  "chatq_persona_tags",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    dimensionId: varchar("dimension_id", { length: 50 })
+      .notNull()
+      .references(() => chatqDimensions.dimensionId, { onDelete: "cascade" }),
+    tagId: varchar("tag_id", { length: 50 }).notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    sentiment: personaTagSentimentEnum("sentiment").notNull(),
+    weightDefault: real("weight_default").default(0.5).notNull(),
+    description: text("description"),
+    sort: integer("sort").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("chatq_persona_tags_dimension_tag").on(
+      table.dimensionId,
+      table.tagId
+    ),
+    index("chatq_persona_tags_dimension_idx").on(table.dimensionId),
+  ]
+);
+
+/** ChatQ 场景表 */
+export const chatqScenes = pgTable("chatq_scenes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sceneId: varchar("scene_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 10 }),
+  color: varchar("color", { length: 20 }),
+  sort: integer("sort").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/** ChatQ 预设关系表 */
+export const chatqRelations = pgTable("chatq_relations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  relationId: varchar("relation_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  sort: integer("sort").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+/** ChatQ 人设包表 */
+export const chatqPersonaPackages = pgTable("chatq_persona_packages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  packageId: varchar("package_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  gender: personaPackageGenderEnum("gender").notNull(),
+  ageRange: jsonb("age_range").$type<string[]>().default([]),
+  tags: jsonb("tags").$type<string[]>().notNull(),
+  scenes: jsonb("scenes").$type<string[]>().notNull(),
+  sort: integer("sort").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export type ChatqDimension = typeof chatqDimensions.$inferSelect;
+export type NewChatqDimension = typeof chatqDimensions.$inferInsert;
+export type ChatqPersonaTag = typeof chatqPersonaTags.$inferSelect;
+export type NewChatqPersonaTag = typeof chatqPersonaTags.$inferInsert;
+export type ChatqScene = typeof chatqScenes.$inferSelect;
+export type NewChatqScene = typeof chatqScenes.$inferInsert;
+export type ChatqRelation = typeof chatqRelations.$inferSelect;
+export type NewChatqRelation = typeof chatqRelations.$inferInsert;
+export type ChatqPersonaPackage = typeof chatqPersonaPackages.$inferSelect;
+export type NewChatqPersonaPackage = typeof chatqPersonaPackages.$inferInsert;

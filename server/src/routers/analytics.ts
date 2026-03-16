@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, sql, desc, asc, count, sum, avg, between, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, asc, count, sum, avg, inArray } from "drizzle-orm";
 import { router, adminProcedure } from "../trpc/index.js";
 import {
   apps,
@@ -73,7 +73,7 @@ export const analyticsRouter = router({
         .from(users)
         .where(eq(users.appId, appId));
 
-      const userIds = appUsers.map((u) => u.id);
+      const userIds = appUsers.map((u: { id: string }) => u.id);
       if (userIds.length === 0) {
         return {
           timeSeries: [],
@@ -154,7 +154,7 @@ export const analyticsRouter = router({
 
       // 活跃用户统计（在指定时间范围内有使用记录的用户）
       const activeUsers = timeSeriesData.reduce(
-        (count, period) => count + Number(period.uniqueUsers || 0),
+        (count: number, period: { uniqueUsers?: number }) => count + Number(period.uniqueUsers || 0),
         0
       );
 
@@ -180,7 +180,7 @@ export const analyticsRouter = router({
           .groupBy(subscriptions.tier);
 
         byTierDistribution = tierData.reduce(
-          (acc, row) => ({
+          (acc: Record<string, unknown>, row: { tier: string; totalReplies?: unknown; totalTokens?: unknown; userCount?: unknown }) => ({
             ...acc,
             [row.tier]: {
               totalReplies: Number(row.totalReplies || 0),
@@ -216,7 +216,7 @@ export const analyticsRouter = router({
           .orderBy(desc(sql`call_count`));
 
         byProviderDistribution = providerData.reduce(
-          (acc, row) => ({
+          (acc: Record<string, unknown>, row: { aiProvider: string | null; model: string | null; callCount?: unknown; totalTokens?: unknown; avgDuration?: unknown; successRate?: unknown }) => ({
             ...acc,
             [`${row.aiProvider}:${row.model}`]: {
               callCount: Number(row.callCount || 0),
@@ -244,7 +244,7 @@ export const analyticsRouter = router({
         .limit(10);
 
       return {
-        timeSeries: timeSeriesData.map((row) => ({
+        timeSeries: timeSeriesData.map((row: { timePeriod: unknown; totalReplies?: unknown; totalTokens?: unknown; successfulCalls?: unknown; failedCalls?: unknown; uniqueUsers?: unknown }) => ({
           timePeriod: row.timePeriod,
           totalReplies: Number(row.totalReplies || 0),
           totalTokens: Number(row.totalTokens || 0),
@@ -321,7 +321,7 @@ export const analyticsRouter = router({
         .from(users)
         .where(eq(users.appId, appId));
 
-      const userIds = appUsers.map((u) => u.id);
+      const userIds = appUsers.map((u: { id: string }) => u.id);
       if (userIds.length === 0) {
         return {
           mrr: 0,
@@ -359,16 +359,8 @@ export const analyticsRouter = router({
           )
         );
 
-      // 计算 MRR（月度经常性收入）
-      const monthlyPlans = plans.filter(
-        (p) => p.billingPeriod === "monthly" && p.tier !== "free"
-      );
-      const yearlyPlans = plans.filter(
-        (p) => p.billingPeriod === "yearly" && p.tier !== "free"
-      );
-
       let mrr = 0;
-      activeSubscriptions.forEach(({ plan, subscription }) => {
+      activeSubscriptions.forEach(({ plan }: { plan: { billingPeriod: string; priceCents: number }; subscription?: unknown }) => {
         if (plan.billingPeriod === "monthly") {
           mrr += plan.priceCents / 100; // 分转元
         } else if (plan.billingPeriod === "yearly") {
@@ -390,10 +382,10 @@ export const analyticsRouter = router({
         .groupBy(subscriptions.status);
 
       const subscriptionStats = {
-        total: subscriptionStatsQuery.reduce((sum, row) => sum + Number(row.count || 0), 0),
-        active: subscriptionStatsQuery.find((row) => row.status === "active")?.count || 0,
-        cancelled: subscriptionStatsQuery.find((row) => row.status === "cancelled")?.count || 0,
-        expired: subscriptionStatsQuery.find((row) => row.status === "expired")?.count || 0,
+        total: subscriptionStatsQuery.reduce((sum: number, row: { count?: unknown }) => sum + Number(row.count || 0), 0),
+        active: subscriptionStatsQuery.find((row: { status: string }) => row.status === "active")?.count || 0,
+        cancelled: subscriptionStatsQuery.find((row: { status: string }) => row.status === "cancelled")?.count || 0,
+        expired: subscriptionStatsQuery.find((row: { status: string }) => row.status === "expired")?.count || 0,
       };
 
       // 转化漏斗分析
@@ -425,7 +417,7 @@ export const analyticsRouter = router({
 
       // 计划性能分析
       const planPerformance = await Promise.all(
-        plans.map(async (plan) => {
+        plans.map(async (plan: { id: string; name: string; billingPeriod: string; priceCents: number; currency: string; features?: unknown[] | null }) => {
           const planSubscriptions = await ctx.db
             .select({ count: count() })
             .from(subscriptions)
@@ -492,7 +484,7 @@ export const analyticsRouter = router({
           freeToProConversion: freeCount > 0 ? (proCount / freeCount) * 100 : 0,
         },
         planPerformance,
-        revenueTrend: revenueTrend.map((row) => ({
+        revenueTrend: revenueTrend.map((row: { month: unknown; revenue?: unknown; newSubscriptions?: unknown }) => ({
           month: row.month,
           revenue: Number(row.revenue || 0),
           newSubscriptions: Number(row.newSubscriptions || 0),
@@ -572,7 +564,7 @@ export const analyticsRouter = router({
       }> = [];
 
       // 简化版同期群分析：按注册月份分组
-      const userGroups = allUsers.reduce((groups, user) => {
+      const userGroups = allUsers.reduce((groups: Record<string, typeof allUsers>, user: (typeof allUsers)[number]) => {
         const cohortKey = periodType === "month"
           ? user.createdAt.toISOString().substring(0, 7) // YYYY-MM
           : `${user.createdAt.toISOString().substring(0, 10)}`; // 简化处理
@@ -597,13 +589,14 @@ export const analyticsRouter = router({
           periodEnd.setMonth(periodEnd.getMonth() + 1);
 
           // 统计在该周期内活跃的用户数
-          const activeInPeriod = cohortUsers.filter((user) => {
+          const activeInPeriod = (cohortUsers as Array<{ lastLoginAt?: Date }>).filter((user) => {
             if (!user.lastLoginAt) return false;
             return user.lastLoginAt >= periodStart && user.lastLoginAt < periodEnd;
           }).length;
 
-          const retentionRate = cohortUsers.length > 0
-            ? (activeInPeriod / cohortUsers.length) * 100
+          const cohortArr = cohortUsers as unknown[];
+          const retentionRate = cohortArr.length > 0
+            ? (activeInPeriod / cohortArr.length) * 100
             : 0;
 
           retention[`period_${i}`] = retentionRate;
@@ -611,29 +604,29 @@ export const analyticsRouter = router({
 
         cohorts.push({
           cohortPeriod,
-          totalUsers: cohortUsers.length,
+          totalUsers: (cohortUsers as unknown[]).length,
           retention,
         });
       }
 
       // 用户活跃度分析
       const activityLevels = {
-        daily: allUsers.filter((u) => {
+        daily: allUsers.filter((u: { lastLoginAt?: Date | null }) => {
           if (!u.lastLoginAt) return false;
           const daysSinceLastLogin = (Date.now() - u.lastLoginAt.getTime()) / (1000 * 60 * 60 * 24);
           return daysSinceLastLogin <= 1;
         }).length,
-        weekly: allUsers.filter((u) => {
+        weekly: allUsers.filter((u: { lastLoginAt?: Date | null }) => {
           if (!u.lastLoginAt) return false;
           const daysSinceLastLogin = (Date.now() - u.lastLoginAt.getTime()) / (1000 * 60 * 60 * 24);
           return daysSinceLastLogin <= 7;
         }).length,
-        monthly: allUsers.filter((u) => {
+        monthly: allUsers.filter((u: { lastLoginAt?: Date | null }) => {
           if (!u.lastLoginAt) return false;
           const daysSinceLastLogin = (Date.now() - u.lastLoginAt.getTime()) / (1000 * 60 * 60 * 24);
           return daysSinceLastLogin <= 30;
         }).length,
-        inactive: allUsers.filter((u) => {
+        inactive: allUsers.filter((u: { lastLoginAt?: Date | null }) => {
           if (!u.lastLoginAt) return true;
           const daysSinceLastLogin = (Date.now() - u.lastLoginAt.getTime()) / (1000 * 60 * 60 * 24);
           return daysSinceLastLogin > 30;
@@ -641,7 +634,7 @@ export const analyticsRouter = router({
       };
 
       return {
-        userGrowth: growthQuery.map((row) => ({
+        userGrowth: growthQuery.map((row: { period: unknown; newUsers?: unknown; activeUsers?: unknown }) => ({
           period: row.period,
           newUsers: Number(row.newUsers || 0),
           activeUsers: Number(row.activeUsers || 0),
@@ -703,7 +696,7 @@ export const analyticsRouter = router({
           .select({ count: count() })
           .from(users)
           .where(eq(users.appId, appId))
-          .then((rows) => Number(rows[0]?.count || 0)),
+          .then((rows: { count?: number }[]) => Number(rows[0]?.count || 0)),
 
         // 今日活跃用户
         ctx.db
@@ -716,7 +709,7 @@ export const analyticsRouter = router({
               eq(usageRecords.date, sql`CURRENT_DATE`)
             )
           )
-          .then((rows) => Number(rows[0]?.count || 0)),
+          .then((rows: { count?: number }[]) => Number(rows[0]?.count || 0)),
 
         // 今日使用量
         ctx.db
@@ -733,7 +726,7 @@ export const analyticsRouter = router({
               eq(usageRecords.date, sql`CURRENT_DATE`)
             )
           )
-          .then((rows) => ({
+          .then((rows: { totalReplies?: unknown; totalTokens?: unknown; successRate?: unknown }[]) => ({
             totalReplies: Number(rows[0]?.totalReplies || 0),
             totalTokens: Number(rows[0]?.totalTokens || 0),
             successRate: Number(rows[0]?.successRate || 0) * 100,
@@ -751,7 +744,7 @@ export const analyticsRouter = router({
               inArray(subscriptions.tier, ["pro_monthly", "pro_yearly"])
             )
           )
-          .then((rows) => Number(rows[0]?.count || 0)),
+          .then((rows: { count?: number }[]) => Number(rows[0]?.count || 0)),
 
         // 今日收入（简化版）
         ctx.db
@@ -772,7 +765,7 @@ export const analyticsRouter = router({
               eq(subscriptions.createdAt, sql`CURRENT_DATE`)
             )
           )
-          .then((rows) => Number(rows[0]?.revenue || 0)),
+          .then((rows: { revenue?: unknown }[]) => Number(rows[0]?.revenue || 0)),
       ]);
 
       return {
