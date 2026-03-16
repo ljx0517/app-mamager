@@ -1,5 +1,4 @@
 packages:
-  - 'apps/*'     # 放置可运行的应用（如 Next.js, Vue）
-  - 'packages/*' # 放置共享库（如 UI 组件库、工具函数）
+  - 'apps/*'
   - admin
   - server

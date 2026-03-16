@@ -1,8 +1,24 @@
 {
   "name": "app-manager",
   "private": true,
+  "engines": {
+    "pnpm": ">=9"
+  },
   "scripts": {
     "build": "pnpm -r build",
-    "dev": "pnpm -r --parallel dev"
+    "dev": "pnpm -r --parallel dev",
+    "dev:server": "pnpm -F @app-manager/server dev",
+    "dev:admin": "pnpm -F @app-manager/admin dev"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "~5.9.3",
+      "@trpc/server": "11.9.0",
+      "@trpc/client": "11.9.0",
+      "@trpc/react-query": "11.9.0"
+    },
+    "ignoredBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
