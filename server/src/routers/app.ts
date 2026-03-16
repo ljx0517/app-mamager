@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { router, adminProcedure } from "../trpc/index.js";
-import { apps, users, subscriptions, styles, usageRecords, type AppSettings, type AIProviderType, type AIProviderConfig } from "../db/schema.js";
+import { apps, users, type AppSettings, type AIProviderConfig } from "../db/schema.js";
 import { generateApiKey, generateApiSecret } from "../utils/crypto.js";
 import { TRPCError } from "@trpc/server";
 import { sql } from "drizzle-orm";
@@ -98,7 +98,7 @@ export const appRouter = router({
     const appList = await ctx.db.select().from(apps).orderBy(apps.createdAt);
 
     // 转换 isActive 为 status 字段
-    return appList.map((app) => ({
+    return appList.map((app: typeof apps.$inferSelect) => ({
       ...app,
       status: app.isActive ? "active" : "inactive",
     }));
@@ -142,6 +142,7 @@ export const appRouter = router({
       z.object({
         id: z.string().uuid(),
         name: z.string().min(1).max(100).optional(),
+        bundleId: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         isActive: z.boolean().optional(),
         configName: z.string().min(1).max(100).optional(),

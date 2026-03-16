@@ -96,13 +96,17 @@ export interface AIServiceOptions {
  * AI 服务错误
  */
 export class AIServiceError extends Error {
+  public readonly providerType: AIProviderType;
+  public readonly code: string;
   constructor(
     message: string,
-    public readonly providerType: AIProviderType,
-    public readonly code: string = "AI_SERVICE_ERROR"
+    providerType: AIProviderType,
+    code: string = "AI_SERVICE_ERROR"
   ) {
     super(`[${providerType}] ${message}`);
     this.name = "AIServiceError";
+    this.providerType = providerType;
+    this.code = code;
   }
 }
 

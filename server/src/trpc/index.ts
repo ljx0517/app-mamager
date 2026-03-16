@@ -2,7 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { eq, and } from "drizzle-orm";
 import type { Context } from "./context.js";
 import { admins, users } from "../db/schema.js";
-import { extractAndVerifyToken, extractAndVerifyUserToken, type AdminJWTPayload, type UserJWTPayload } from "../utils/jwt.js";
+import { extractAndVerifyToken, extractAndVerifyUserToken, type AdminJWTPayload } from "../utils/jwt.js";
 
 /**
  * tRPC 初始化（多租户版）

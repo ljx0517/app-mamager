@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyRequest } from "fastify";
 import { TRPCError, callTRPCProcedure } from "@trpc/server";
 import { appRouter } from "../trpc/router.js";
 import { createContext } from "../trpc/context.js";
@@ -47,27 +47,36 @@ function mapTRPCErrorToHTTP(error: TRPCError): { statusCode: number; message: st
  * 创建 tRPC 调用器
  * 使用 callTRPCProcedure 直接调用过程，避免 createCallerFactory
  */
-async function createTRPCCaller(req: any, res: any) {
+async function createTRPCCaller(req: FastifyRequest, res: any) {
   const context = await createContext({ req, res });
+
+  // 创建 AbortController 用于支持取消操作
+  let abortController: AbortController | null = null;
 
   // 返回一个代理对象，将 query/mutation 调用转发给 callTRPCProcedure
   return {
     query: async (path: string) => {
+      abortController = new AbortController();
       return await callTRPCProcedure({
         ctx: context,
         path,
         input: undefined,
         type: 'query',
         router: appRouter,
+        getRawInput: async () => undefined,
+        signal: abortController.signal,
       });
     },
     mutation: async (path: string, input: unknown) => {
+      abortController = new AbortController();
       return await callTRPCProcedure({
         ctx: context,
         path,
         input,
         type: 'mutation',
         router: appRouter,
+        getRawInput: async () => input,
+        signal: abortController.signal,
       });
     },
   };
@@ -306,7 +315,7 @@ export async function registerRestAdapter(server: FastifyInstance) {
   server.post("/api/user/refresh", async (request, reply) => {
     try {
       const caller = await createTRPCCaller(request, reply);
-      const result = await caller.mutation("user.refresh");
+      const result = await caller.mutation("user.refresh", {});
 
       return reply.status(200).send({
         success: true,
@@ -325,6 +334,40 @@ export async function registerRestAdapter(server: FastifyInstance) {
       }
 
       console.error("User refresh error:", error);
+      return reply.status(500).send({
+        success: false,
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Internal server error",
+        },
+      });
+    }
+  });
+
+  // ==================== ChatQ 键盘 ====================
+
+  /**
+   * POST /api/aikeyboard/reply
+   * 生成回复（支持人设/场景/关系/多候选）
+   */
+  server.post("/api/aikeyboard/reply", async (request, reply) => {
+    try {
+      const caller = await createTRPCCaller(request, reply);
+      const result = await caller.mutation("chatq.customReply.generate", request.body);
+
+      return reply.status(200).send({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        const { statusCode, message } = mapTRPCErrorToHTTP(error);
+        return reply.status(statusCode).send({
+          success: false,
+          error: { code: error.code, message },
+        });
+      }
+      console.error("ChatQ generate error:", error);
       return reply.status(500).send({
         success: false,
         error: {

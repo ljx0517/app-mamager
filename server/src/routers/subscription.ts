@@ -285,7 +285,7 @@ export const subscriptionRouter = router({
         originalTransactionId: z.string().min(1),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx }) => {
       const [user] = await ctx.db
         .select()
         .from(users)

@@ -8,8 +8,6 @@ import type {
   AppleReceiptValidationResult,
   AppleNotification,
   IAppleStoreService,
-  AppleEnvironment,
-  AppleNotificationType,
 } from './types.js';
 
 export class MockAppleStoreService implements IAppleStoreService {
@@ -73,7 +71,7 @@ export class MockAppleStoreService implements IAppleStoreService {
     };
   }
 
-  async verifyWebhookSignature(body: string, signature: string): Promise<boolean> {
+  async verifyWebhookSignature(_body: string, signature: string): Promise<boolean> {
     console.log('🔐 Mock: 验证 Webhook 签名', { signatureLength: signature?.length || 0 });
 
     if (this.config.skipVerification) {

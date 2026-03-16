@@ -1,8 +1,8 @@
-import { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
+import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { apps, type App } from "@/db/schema";
-import { getConfigModule, type AppModuleConfig } from "@/app_settings/registry";
+import { db } from "../db/index.js";
+import { apps, type App } from "../db/schema.js";
+import { getConfigModule, type AppModuleConfig } from "../app_settings/registry.js";
 
 /**
  * tRPC 请求上下文（多租户版）
@@ -16,7 +16,8 @@ import { getConfigModule, type AppModuleConfig } from "@/app_settings/registry";
  *  - 每个 App 有一个 configName 字段，关联 app_settings 目录下的配置
  *  - 不同 App 可以使用相同的配置（配置复用）
  */
-export async function createContext({ req, res }: CreateFastifyContextOptions) {
+export async function createContext(opts: Partial<CreateFastifyContextOptions> & { req: CreateFastifyContextOptions['req']; res: CreateFastifyContextOptions['res'] }) {
+  const { req, res } = opts;
   const apiKey = req.headers["x-api-key"] as string | undefined;
   const deviceId = req.headers["x-device-id"] as string | undefined;
   const authorization = req.headers.authorization;

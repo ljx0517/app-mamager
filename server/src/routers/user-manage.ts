@@ -7,7 +7,6 @@ import {
   subscriptions,
   subscriptionPlans,
   usageRecords,
-  type UserStatus,
 } from "../db/schema.js";
 import { TRPCError } from "@trpc/server";
 import { hashPassword } from "../utils/crypto.js";
@@ -99,9 +98,8 @@ export const userManageRouter = router({
             )
           );
 
-        tierFilteredUserIds = tierUsers.map((u) => u.userId);
+        tierFilteredUserIds = tierUsers.map((u: { userId: string }) => u.userId);
         if (tierFilteredUserIds.length === 0) {
-          // 如果没有匹配的用户，直接返回空结果
           return {
             items: [],
             total: 0,
@@ -109,7 +107,7 @@ export const userManageRouter = router({
             offset,
           };
         }
-        conditions.push(inArray(users.id, tierFilteredUserIds));
+        conditions.push(inArray(users.id, tierFilteredUserIds as string[]));
       }
 
       // 排序
@@ -150,7 +148,7 @@ export const userManageRouter = router({
       const total = Number(totalResult?.count ?? 0);
 
       // 获取用户的订阅信息
-      const userIds = userRows.map((u) => u.id);
+      const userIds = userRows.map((u: { id: string }) => u.id);
       const userSubscriptions = userIds.length > 0
         ? await ctx.db
             .select({
@@ -170,7 +168,7 @@ export const userManageRouter = router({
 
       // 按用户ID分组订阅信息
       const subscriptionsByUserId = userSubscriptions.reduce(
-        (acc, sub) => {
+        (acc: Record<string, typeof userSubscriptions>, sub: (typeof userSubscriptions)[number]) => {
           if (!acc[sub.userId]) {
             acc[sub.userId] = [];
           }
@@ -181,7 +179,7 @@ export const userManageRouter = router({
       );
 
       // 构建返回结果
-      const items = userRows.map((user) => ({
+      const items = userRows.map((user: (typeof userRows)[number]) => ({
         user: {
           id: user.id,
           deviceId: user.deviceId,
@@ -194,7 +192,7 @@ export const userManageRouter = router({
         },
         subscription: subscriptionsByUserId[user.id]?.[0] || null,
         hasActiveSubscription: subscriptionsByUserId[user.id]?.some(
-          (s) => s.status === "active" && s.tier !== "free"
+          (s: { status: string; tier: string }) => s.status === "active" && s.tier !== "free"
         ) || false,
       }));
 
@@ -265,7 +263,7 @@ export const userManageRouter = router({
 
       // 查询当前活跃订阅
       const activeSubscription = subscriptionHistory.find(
-        (s) => s.subscription.status === "active"
+        (s: { subscription: { status: string } }) => s.subscription.status === "active"
       );
 
       // 查询使用统计（最近30天）
@@ -321,13 +319,13 @@ export const userManageRouter = router({
         usageStats: {
           recent30Days: usageStats,
           summary: {
-            totalReplies: usageStats.reduce((sum, day) => sum + Number(day.totalReplies || 0), 0),
-            totalTokens: usageStats.reduce((sum, day) => sum + Number(day.totalTokens || 0), 0),
-            totalCalls: usageStats.reduce((sum, day) =>
+            totalReplies: usageStats.reduce((sum: number, day: { totalReplies?: unknown }) => sum + Number(day.totalReplies || 0), 0),
+            totalTokens: usageStats.reduce((sum: number, day: { totalTokens?: unknown }) => sum + Number(day.totalTokens || 0), 0),
+            totalCalls: usageStats.reduce((sum: number, day: { successfulCalls?: unknown; failedCalls?: unknown }) =>
               sum + Number(day.successfulCalls || 0) + Number(day.failedCalls || 0), 0),
             successRate: usageStats.length > 0
-              ? (usageStats.reduce((sum, day) => sum + Number(day.successfulCalls || 0), 0) /
-                 Math.max(1, usageStats.reduce((sum, day) =>
+              ? (usageStats.reduce((sum: number, day: { successfulCalls?: unknown; failedCalls?: unknown }) => sum + Number(day.successfulCalls || 0), 0) /
+                 Math.max(1, usageStats.reduce((sum: number, day: { successfulCalls?: unknown; failedCalls?: unknown }) =>
                    sum + Number(day.successfulCalls || 0) + Number(day.failedCalls || 0), 0)) * 100
                 ).toFixed(1)
               : "0",
@@ -480,7 +478,7 @@ export const userManageRouter = router({
       const passwordHash = await hashPassword(password);
 
       // 更新用户密码
-      const [updated] = await ctx.db
+      await ctx.db
         .update(users)
         .set({
           passwordHash,

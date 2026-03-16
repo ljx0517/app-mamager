@@ -5,13 +5,15 @@ import { subscriptionManageRouter } from "../routers/subscription-manage.js";
 import { userManageRouter } from "../routers/user-manage.js";
 import { analyticsRouter } from "../routers/analytics.js";
 import { settingsRouter } from "../routers/settings.js";
+import { templateRouter } from "../routers/template.js";
 import { userRouter } from "../routers/user.js";
 import { aiRouter } from "../routers/ai.js";
 import { styleRouter } from "../routers/style.js";
 import { subscriptionRouter } from "../routers/subscription.js";
+import { chatqManageRouter } from "../routers/chatq-manage.js";
 
 // 导入 App 配置模块（动态注册）
-import { getAllConfigModules } from "@/app_settings/registry";
+import { getAllConfigModules } from "../app_settings/registry.js";
 
 /**
  * 构建 App 配置路由对象
@@ -26,7 +28,7 @@ function buildAppRouters() {
 
     // 将每个配置的路由挂载到其配置名下
     for (const [routeName, routeDef] of Object.entries(configModule.routers)) {
-      // 例如：ai-keyboard-pro.customReply
+      // 例如：chatq.customReply
       const fullPath = `${configName}.${routeName}`;
       appRouters[fullPath] = routeDef;
     }
@@ -42,6 +44,7 @@ function buildAppRouters() {
  *  ┌─ 管理后台（需要 Admin 认证）──────────┐
  *  │ admin.*              管理员认证与管理   │
  *  │ app.*                应用 CRUD 管理     │
+ *  │ template.*           配置模板管理       │
  *  │ subscriptionManage.* 订阅计划与用户订阅管理 │
  *  └──────────────────────────────────────┘
  *  ┌─ 客户端 API（需要 x-api-key）────────┐
@@ -51,7 +54,7 @@ function buildAppRouters() {
  *  │ subscription.*       订阅查询与验证     │
  *  └──────────────────────────────────────┘
  *  ┌─ App 配置路由（按 configName 隔离）───┐
- *  │ ai-keyboard-pro.*    AI Keyboard Pro  │
+ *  │ chatq.*             ChatQ Keyboard    │
  *  │ ai-keyboard-lite.*  AI Keyboard Lite  │
  *  └──────────────────────────────────────┘
  */
@@ -63,6 +66,8 @@ export const appRouter = router({
   userManage: userManageRouter,
   analytics: analyticsRouter,
   settings: settingsRouter,
+  template: templateRouter,
+  chatqManage: chatqManageRouter,
 
   // 客户端 API（App 隔离）
   user: userRouter,

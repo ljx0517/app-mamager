@@ -14,17 +14,17 @@ Multi-tenant backend for multiple iOS apps:
 - Config shared across apps via `configName`
 
 ## 3. Must-Use Tools & Commands (Actionable Bash)
-Package manager: **yarn only** (no pnpm / npm)
+Package manager: **pnpm** (monorepo 统一管理)
 ```bash
-yarn install          # Install deps
-yarn dev              # Dev with hot reload
-yarn build            # Build for production
-yarn start            # Run production build
+pnpm install          # Install deps (根目录执行)
+pnpm dev              # Dev with hot reload
+pnpm build            # Build for production
+pnpm start            # Run production build
 
-yarn db:generate      # Generate DB migration
-yarn db:migrate       # Apply migration
-yarn db:push          # Dev only: push schema directly
-yarn db:studio        # Open Drizzle Studio
+pnpm db:generate      # Generate DB migration
+pnpm db:migrate       # Apply migration
+pnpm db:push          # Dev only: push schema directly
+pnpm db:studio        # Open Drizzle Studio
 ```
 
 ## 4. Key Directories (Where things live)

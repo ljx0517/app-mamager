@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { router, appProcedure, protectedProcedure } from "../trpc/index.js";
 import { users, subscriptions } from "../db/schema.js";
 import { hashPassword, verifyPassword, generateVerificationToken, generateResetToken, getTokenExpiryDate, isTokenExpired } from "../utils/crypto.js";

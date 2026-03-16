@@ -11,7 +11,7 @@ import { registerRestAdapter } from "./routers/rest-adapter.js";
 
 // 导入并注册 App 配置模块
 import "./app_settings/common/index.js";
-import "./app_settings/ai-keyboard-pro/index.js";
+import "./app_settings/chatq/index.js";
 import { getRegisteredConfigNames } from "./app_settings/registry.js";
 
 /**
@@ -33,16 +33,18 @@ async function main() {
     },
   });
 
-  // CORS 支持
+  // CORS：建议生产环境设置 CORS_ORIGIN 或 ADMIN_ORIGIN 为管理后台地址，未设置时允许任意（*）
+  const corsOrigin = process.env.CORS_ORIGIN ?? process.env.ADMIN_ORIGIN ?? "*";
+
   server.addHook("onRequest", async (request, reply) => {
-    reply.header("Access-Control-Allow-Origin", "*");
+    reply.header("Access-Control-Allow-Origin", corsOrigin);
     reply.header(
       "Access-Control-Allow-Methods",
       "GET, POST, PUT, DELETE, OPTIONS"
     );
     reply.header(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, x-api-key, x-device-id"
+      "Content-Type, Authorization, x-api-key, x-device-id, x-app-id"
     );
 
     if (request.method === "OPTIONS") {

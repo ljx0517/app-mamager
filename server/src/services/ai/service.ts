@@ -1,6 +1,6 @@
 import type { AppSettings, AIProviderConfig, AIProviderType } from "../../db/schema.js";
 import type { AIProvider, AIGenerateRequest, AIGenerateResponse, AIServiceOptions } from "./types.js";
-import { AIServiceError, ProviderUnavailableError, InvalidConfigError } from "./types.js";
+import { AIServiceError, InvalidConfigError } from "./types.js";
 
 /**
  * AI 服务管理器

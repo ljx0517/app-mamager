@@ -40,7 +40,7 @@ const appleWebhookPlugin: FastifyPluginAsync = async (fastify) => {
       const isSignatureValid = await appleService.verifyWebhookSignature(body, signature);
 
       if (!isSignatureValid) {
-        fastify.log.warn("Apple Webhook 签名验证失败", { signature });
+        fastify.log.warn({ msg: "Apple Webhook 签名验证失败", signature });
         return reply.status(401).send({
           error: "INVALID_SIGNATURE",
           message: "签名验证失败",
@@ -50,7 +50,8 @@ const appleWebhookPlugin: FastifyPluginAsync = async (fastify) => {
       // 2. 解析通知
       const notification = await appleService.parseWebhookNotification(body);
 
-      fastify.log.info("收到 Apple Webhook 通知", {
+      fastify.log.info({
+        msg: "收到 Apple Webhook 通知",
         notificationType: notification.notificationType,
         notificationUUID: notification.notificationUUID,
         originalTransactionId: notification.data.originalTransactionId,
@@ -68,7 +69,7 @@ const appleWebhookPlugin: FastifyPluginAsync = async (fastify) => {
       });
 
     } catch (error) {
-      fastify.log.error("处理 Apple Webhook 失败", error);
+      fastify.log.error({ msg: "处理 Apple Webhook 失败", err: error });
       return reply.status(500).send({
         error: "PROCESSING_ERROR",
         message: "处理通知时发生错误",
