@@ -12,9 +12,6 @@ export default function AppSwitcher({ collapsed = false, loading = false, error 
   const { apps, currentAppId, setCurrentApp } = useAppStore()
   const { token } = theme.useToken()
 
-  // 调试：打印 apps 数组
-  console.log('[AppSwitcher] apps:', apps, 'loading:', loading, 'error:', error)
-
   const currentApp = apps.find((app) => app.id === currentAppId)
 
   // 状态颜色映射

@@ -64,6 +64,7 @@ export interface Subscription {
   endDate: string
   autoRenew: boolean
   transactionId?: string
+  planId?: string
 }
 
 // ===== 仪表盘统计 =====

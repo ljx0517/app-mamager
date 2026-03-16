@@ -31,7 +31,7 @@ export default function AdminLayout() {
   const { token: themeToken } = theme.useToken()
 
   // 获取应用列表
-  const { data: appsData, isLoading: appsLoading, error: appsError } = trpc.app.list.useQuery(undefined)
+  const { data: appsData, isLoading: appsLoading } = trpc.app.list.useQuery(undefined)
 
   // 处理 API 返回的数据
   useEffect(() => {
@@ -41,10 +41,11 @@ export default function AdminLayout() {
         name: app.name,
         slug: app.slug || '',
         description: app.description || '',
-        icon: '📱',
+        icon: app.icon || '📱',
         platform: app.platform as 'ios' | 'android' | 'web' | 'cross_platform',
         bundleId: app.bundleId,
         status: app.status as 'active' | 'inactive' | 'maintenance' | 'archived',
+        configTemplate: app.configTemplate || undefined,
         createdAt: app.createdAt?.toString() || new Date().toISOString(),
         updatedAt: app.updatedAt?.toString() || new Date().toISOString(),
       }))
@@ -85,6 +86,7 @@ export default function AdminLayout() {
       children: [
         { key: '/settings/templates', label: '模板管理' },
         { key: '/settings/system', label: '系统配置' },
+        { key: '/settings/chatq-data', label: 'ChatQ 主数据' },
       ],
     },
   ]

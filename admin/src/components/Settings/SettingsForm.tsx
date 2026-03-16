@@ -76,7 +76,7 @@ export function SettingsForm({
             description={section.description}
           />
           <div className="mt-4">
-            <Component values={values} />
+            <Component values={values} onChange={onChange} />
           </div>
         </Card>
       )

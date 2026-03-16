@@ -63,6 +63,8 @@ export function hasConfigTemplate(templateId: string): boolean {
 
 const templateSettingsImports = {
   'ai-keyboard': () => import('@/pages/Settings/configs/ai-keyboard'),
+  'chatq': () => import('@/pages/Settings/configs/chatq'),
+  'clipboard': () => import('@/pages/Settings/configs/clipboard'),
 } as const
 
 // ===== 注册配置模板 =====
@@ -75,6 +77,26 @@ registerConfigTemplate({
   description: '智能键盘应用配置模板',
   enabled: true,
   settingsComponent: templateSettingsImports['ai-keyboard'],
+})
+
+// 注册 ChatQ 配置模板
+registerConfigTemplate({
+  id: 'chatq',
+  displayName: 'ChatQ Keyboard',
+  icon: '💬',
+  description: 'ChatQ 键盘配置 - 自定义回复和关键词自动回复',
+  enabled: true,
+  settingsComponent: templateSettingsImports['chatq'],
+})
+
+// 注册 Clipboard Tool 配置模板
+registerConfigTemplate({
+  id: 'clipboard',
+  displayName: 'Clipboard Tool',
+  icon: '📋',
+  description: '剪贴板工具配置 - 剪贴板历史和快捷粘贴',
+  enabled: true,
+  settingsComponent: templateSettingsImports['clipboard'],
 })
 
 // ===== 后续新增配置模板只需在此添加 =====

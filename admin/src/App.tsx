@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect, React, Suspense } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useAppStore } from '@/stores/appStore'
 import AdminLayout from '@/layouts/AdminLayout'
@@ -12,8 +12,9 @@ import SettingsPage from '@/pages/Settings'
 import AppsPage from '@/pages/Apps'
 
 // 懒加载页面
-const SettingsTemplatesPage = React.lazy(() => import('@/pages/Settings/templates'))
-const SettingsSystemPage = React.lazy(() => import('@/pages/Settings/system'))
+const SettingsTemplatesPage = lazy(() => import('@/pages/Settings/templates'))
+const SettingsSystemPage = lazy(() => import('@/pages/Settings/system'))
+const SettingsChatqDataPage = lazy(() => import('@/pages/Settings/chatq-data'))
 
 /**
  * 路由守卫：未登录时重定向到登录页
@@ -103,15 +104,20 @@ export default function App() {
             <SettingsSystemPage />
           </Suspense>
         } />
+        <Route path="/settings/chatq-data" element={
+          <Suspense fallback={<div>加载中...</div>}>
+            <SettingsChatqDataPage />
+          </Suspense>
+        } />
 
         {/* 某个 App 的业务页面 */}
         <Route path="/:appId/dashboard" element={<DashboardPage />} />
         <Route path="/:appId/users" element={<UsersPage />} />
         <Route path="/:appId/subscriptions" element={<SubscriptionsPage />} />
         <Route path="/:appId/analytics" element={<AnalyticsPage />} />
-        <Route path="/:appId/settings" element={<SettingsPage />} />
-        {/* 配置模板页面 */}
+        {/* 配置模板页面 - 必须放在 /:appId/settings 之前 */}
         <Route path="/:appId/settings/:templateId" element={<SettingsPage />} />
+        <Route path="/:appId/settings" element={<SettingsPage />} />
 
         {/* 首页：重定向到第一个 App 的仪表盘 */}
         <Route path="/" element={<IndexRedirect />} />

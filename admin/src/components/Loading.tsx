@@ -24,7 +24,7 @@ interface LoadingProps {
  * 支持多种加载场景：全屏加载、内联加载、骨架屏占位
  */
 export default function Loading({
-  loading = true,
+  loading: _loading = true,
   tip = '加载中...',
   skeleton = false,
   rows = 3,

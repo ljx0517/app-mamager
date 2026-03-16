@@ -34,13 +34,14 @@ export const useAppStore = create<AppState>()(
 
       setCurrentApp: (appId) => set({ currentAppId: appId }),
 
-      setApps: (apps) => set((state) => ({
-        apps,
-        // 如果当前选中的 App 不在列表中，自动切换到第一个
-        currentAppId: state.currentAppId && apps.some(a => a.id === state.currentAppId)
-          ? state.currentAppId
-          : apps[0]?.id ?? null
-      })),
+      setApps: (apps) => set((state) => {
+        // 空列表时不清空 currentAppId，避免从应用管理跳转设置页时被 AdminLayout 的 setApps 覆盖
+        const keepCurrent =
+          state.currentAppId && apps.some((a) => a.id === state.currentAppId)
+        const nextId =
+          keepCurrent ? state.currentAppId : (apps.length > 0 ? apps[0].id : state.currentAppId)
+        return { apps, currentAppId: nextId }
+      }),
 
       addApp: (app) =>
         set((state) => ({ apps: [...state.apps, app] })),

@@ -8,11 +8,14 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
-import { trpc, trpcClient, queryClient } from '@/utils/trpc'
+import { trpc, trpcClient, queryClient, setupGlobalErrorHandler } from '@/utils/trpc'
 import App from './App'
 import './index.css'
 
 dayjs.locale('zh-cn')
+
+// 初始化全局错误处理
+setupGlobalErrorHandler()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
