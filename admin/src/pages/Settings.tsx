@@ -2,7 +2,7 @@
  * 设置页面入口
  * 支持通过 configTemplate 动态加载各 App 的配置模板
  */
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useLayoutEffect, useState, Suspense, lazy, type LazyExoticComponent, type ComponentType } from 'react'
 import { Card, Empty, Spin, Tabs, Row, Col, Form, Input, InputNumber, Switch, Button, Space, Alert, message } from 'antd'
 import {
   ApiOutlined,
@@ -10,26 +10,36 @@ import {
   BellOutlined,
   SecurityScanOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import PageHeader from '@/components/PageHeader'
 import { useAppStore } from '@/stores/appStore'
 import { trpc } from '@/utils/trpc'
-import { hasConfigTemplate, getConfigTemplate, getRegisteredTemplates } from '@/config/appRegistry'
+import { hasConfigTemplate, getRegisteredTemplates } from '@/config/appRegistry'
 
-// 懒加载各配置模板的设置页面
-const templateSettingsImports: Record<string, () => Promise<{ default: React.ComponentType }>> = {
-  'ai-keyboard': () => import('@/pages/Settings/configs/ai-keyboard').then(module => ({ default: module.default })),
+// 懒加载各配置模板的设置页面（用 lazy 才能正确渲染组件，否则会把 import 函数当组件渲染导致无内容、无请求）
+const templateSettingsLazy: Record<string, LazyExoticComponent<ComponentType<{ appIdFromParent?: string }>>> = {
+  'ai-keyboard': lazy(() => import('@/pages/Settings/configs/ai-keyboard').then(m => ({ default: m.default }))),
+  'chatq': lazy(() => import('@/pages/Settings/configs/chatq').then(m => ({ default: m.default }))),
+  'clipboard': lazy(() => import('@/pages/Settings/configs/clipboard').then(m => ({ default: m.default }))),
 }
 
 export default function SettingsPage() {
-  const { templateId } = useParams<{ templateId?: string }>()
-  const { currentApp } = useAppStore()
+  const location = useLocation()
+  const { appId, templateId } = useParams<{ appId?: string; templateId?: string }>()
+  const { currentApp, setCurrentApp, apps } = useAppStore()
 
-  // 获取当前 App 绑定的配置模板
-  const configTemplate = currentApp?.configTemplate || templateId
+  // 当 URL 中有 appId 时立即同步到 store（用 useLayoutEffect 在首帧前执行，避免从应用管理跳转时子组件读到 currentAppId 为空）
+  useLayoutEffect(() => {
+    if (appId) {
+      setCurrentApp(appId)
+    }
+  }, [appId, setCurrentApp])
+
+  // 获取当前 App 绑定的配置模板 - 优先从 store 获取，若从应用管理跳转时 store 可能尚未同步，故优先使用 URL 的 templateId
+  const configTemplate = templateId || currentApp?.configTemplate || null
 
   // 检测是否有专属配置
-  const hasCustom = configTemplate ? hasConfigTemplate(configTemplate) : false
+  const hasCustom = !!configTemplate && hasConfigTemplate(configTemplate)
 
   // 如果 URL 中指定了 templateId 且有专属配置，渲染专属页面
   if (templateId && hasCustom) {
@@ -49,7 +59,7 @@ export default function SettingsPage() {
           </div>
         }
       >
-        <TemplateSettingsLoader templateId={templateId} />
+        <TemplateSettingsLoader templateId={templateId} appId={appId} />
       </Suspense>
     )
   }
@@ -65,11 +75,12 @@ export default function SettingsPage() {
 
 /**
  * 动态加载配置模板页面
+ * @param appId 从 URL 传入，保证从应用管理跳转时首帧就有值，不依赖 store
  */
-function TemplateSettingsLoader({ templateId }: { templateId: string }) {
-  const SettingsComponent = templateSettingsImports[templateId]
+function TemplateSettingsLoader({ templateId, appId }: { templateId: string; appId?: string }) {
+  const LazyComponent = templateSettingsLazy[templateId]
 
-  if (!SettingsComponent) {
+  if (!LazyComponent) {
     return (
       <div>
         <PageHeader
@@ -86,9 +97,7 @@ function TemplateSettingsLoader({ templateId }: { templateId: string }) {
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Component = SettingsComponent as any
-  return <Component />
+  return <LazyComponent appIdFromParent={appId} />
 }
 
 /**
@@ -98,25 +107,24 @@ function TemplateSettingsLoader({ templateId }: { templateId: string }) {
 function TemplateSettingsSelector() {
   const { currentApp } = useAppStore()
   const navigate = useNavigate()
+  const { appId } = useParams<{ appId?: string }>()
+  const availableTemplates = getRegisteredTemplates()
 
   // 获取当前 App 的配置模板
   const configTemplate = currentApp?.configTemplate
 
   // 如果当前 App 已有配置模板，直接跳转
-  if (configTemplate && hasConfigTemplate(configTemplate)) {
-    navigate(`/settings/${configTemplate}`)
+  if (configTemplate && hasConfigTemplate(configTemplate) && appId) {
+    navigate(`/${appId}/settings/${configTemplate}`)
     return null
   }
 
-  // 获取所有可用的配置模板
-  const availableTemplates = getRegisteredTemplates()
-
   // 如果只有一个，直接跳转
   useEffect(() => {
-    if (availableTemplates.length === 1) {
-      navigate(`/settings/${availableTemplates[0].id}`)
+    if (availableTemplates.length === 1 && appId) {
+      navigate(`/${appId}/settings/${availableTemplates[0].id}`)
     }
-  }, [availableTemplates, navigate])
+  }, [availableTemplates, navigate, appId])
 
   if (availableTemplates.length === 0) {
     return <DefaultSettingsPage />
@@ -132,8 +140,8 @@ function TemplateSettingsSelector() {
   }
 
   // 跳转到当前应用的配置模板页
-  if (configTemplate && hasConfigTemplate(configTemplate)) {
-    navigate(`/settings/${configTemplate}`)
+  if (configTemplate && hasConfigTemplate(configTemplate) && appId) {
+    navigate(`/${appId}/settings/${configTemplate}`)
     return null
   }
 
@@ -157,7 +165,7 @@ function TemplateSettingsSelector() {
             <Card
               hoverable
               style={{ borderRadius: 12 }}
-              onClick={() => navigate(`/settings/${template.id}`)}
+              onClick={() => appId && navigate(`/${appId}/settings/${template.id}`)}
             >
               <Space>
                 <span style={{ fontSize: 24 }}>{template.icon}</span>
@@ -182,7 +190,9 @@ function TemplateSettingsSelector() {
  */
 function DefaultSettingsPage() {
   const { currentApp } = useAppStore()
-  const currentAppId = currentApp?.id
+  // 优先使用 store 中的 currentApp，如果为空则从 URL 参数获取
+  const { appId: appIdFromParams } = useParams<{ appId?: string }>()
+  const currentAppId = currentApp?.id || appIdFromParams || null
 
   const [apiForm] = Form.useForm()
   const [subscriptionForm] = Form.useForm()
@@ -256,7 +266,7 @@ function DefaultSettingsPage() {
           <Form
             form={apiForm}
             layout="vertical"
-            initialValues={settings}
+            initialValues={settings ?? undefined}
             onFinish={handleSave}
           >
             <Row gutter={24}>
@@ -295,11 +305,11 @@ function DefaultSettingsPage() {
       label: <Space><SettingOutlined />订阅配置</Space>,
       children: (
         <Card style={{ borderRadius: 12 }}>
-          <Alert message={`修改 ${currentApp?.name} 的订阅配置将影响所有新用户，现有订阅不受影响`} type="warning" showIcon className="mb-6" />
+          <Alert message={`修改 ${currentApp?.name ?? '当前应用'} 的订阅配置将影响所有新用户，现有订阅不受影响`} type="warning" showIcon className="mb-6" />
           <Form
             form={subscriptionForm}
             layout="vertical"
-            initialValues={settings}
+            initialValues={settings ?? undefined}
             onFinish={handleSave}
           >
             <Row gutter={24}>
@@ -331,7 +341,7 @@ function DefaultSettingsPage() {
           <Form
             form={notificationForm}
             layout="vertical"
-            initialValues={settings}
+            initialValues={settings ?? undefined}
             onFinish={handleSave}
           >
             <Row gutter={24}>
@@ -364,7 +374,7 @@ function DefaultSettingsPage() {
           <Form
             form={securityForm}
             layout="vertical"
-            initialValues={settings}
+            initialValues={settings ?? undefined}
             onFinish={handleSave}
           >
             <Form.Item>
@@ -378,11 +388,13 @@ function DefaultSettingsPage() {
     },
   ]
 
+  const displayName = currentApp ? `${currentApp.icon} ${currentApp.name}` : '当前应用'
+
   return (
     <div>
       <PageHeader
         title="应用设置"
-        subtitle={`${currentApp?.icon} ${currentApp?.name} 的配置管理`}
+        subtitle={`${displayName} 的配置管理`}
         breadcrumbs={[{ title: '应用设置' }]}
       />
       <Tabs items={tabItems} type="card" />

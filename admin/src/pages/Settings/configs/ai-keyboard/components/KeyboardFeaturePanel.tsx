@@ -60,11 +60,18 @@ const features: FeatureItem[] = [
 ]
 
 interface KeyboardFeaturePanelProps {
-  values?: Record<string, boolean>
-  onChange?: (key: string, value: boolean) => void
+  /** 表单值 */
+  values?: Record<string, any>
+  /** 值变化回调 */
+  onChange?: (values: Record<string, any>) => void
 }
 
 export function KeyboardFeaturePanel({ values = {}, onChange }: KeyboardFeaturePanelProps) {
+  // 处理开关变化
+  const handleSwitchChange = (featureKey: string, checked: boolean) => {
+    onChange?.({ ...values, [featureKey]: checked })
+  }
+
   return (
     <div>
       <Row gutter={[16, 16]}>
@@ -94,8 +101,8 @@ export function KeyboardFeaturePanel({ values = {}, onChange }: KeyboardFeatureP
                   </div>
                 </div>
                 <Switch
-                  checked={values[feature.key]}
-                  onChange={(checked) => onChange?.(feature.key, checked)}
+                  checked={values[feature.key] !== false}
+                  onChange={(checked) => handleSwitchChange(feature.key, checked)}
                 />
               </Space>
             </Card>

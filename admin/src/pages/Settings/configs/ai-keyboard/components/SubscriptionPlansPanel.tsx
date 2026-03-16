@@ -25,13 +25,16 @@ const plans: PlanItem[] = [
 ]
 
 interface SubscriptionPlansPanelProps {
+  /** 表单值 */
   values?: Record<string, any>
-  onChange?: (key: string, value: any) => void
+  /** 值变化回调 */
+  onChange?: (values: Record<string, any>) => void
 }
 
 export function SubscriptionPlansPanel({ values = {}, onChange }: SubscriptionPlansPanelProps) {
   const subscriptionConfig = values.subscriptionConfig || {}
 
+  // 处理订阅配置变化
   const handlePlanChange = (planKey: string, field: string, value: any) => {
     const newConfig = {
       ...subscriptionConfig,
@@ -40,7 +43,7 @@ export function SubscriptionPlansPanel({ values = {}, onChange }: SubscriptionPl
         [field]: value,
       },
     }
-    onChange?.('subscriptionConfig', newConfig)
+    onChange?.({ ...values, subscriptionConfig: newConfig })
   }
 
   return (
@@ -70,7 +73,7 @@ export function SubscriptionPlansPanel({ values = {}, onChange }: SubscriptionPl
                 <div>
                   <Text type="secondary">免费用户提供基础功能</Text>
                   <Divider style={{ margin: '12px 0' }} />
-                  <Space direction="vertical" style={{ width: '100%' }}>
+                  <Space orientation="vertical" style={{ width: '100%' }}>
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Text>启用订阅</Text>
                       <Switch
@@ -82,7 +85,7 @@ export function SubscriptionPlansPanel({ values = {}, onChange }: SubscriptionPl
                   </Space>
                 </div>
               ) : (
-                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                <Space orientation="vertical" style={{ width: '100%' }} size="middle">
                   <div>
                     <Text type="secondary">价格 (美元)</Text>
                     <InputNumber
@@ -110,7 +113,7 @@ export function SubscriptionPlansPanel({ values = {}, onChange }: SubscriptionPl
 
                   <Text strong>权益配置</Text>
 
-                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                  <Space orientation="vertical" style={{ width: '100%' }} size="small">
                     <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                       <Text type="secondary">AI 回复</Text>
                       <Switch

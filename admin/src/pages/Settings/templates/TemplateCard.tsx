@@ -1,11 +1,11 @@
-import { Card, Button, Space, Popconfirm, Typography } from 'antd'
+import { Card, Button, Space, Popconfirm, Typography, Tag } from 'antd'
 import { EditOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons'
-import type { ConfigTemplate } from '@/config/appRegistry'
+import type { TemplateInfo } from '@/types/template'
 
 const { Text } = Typography
 
 interface TemplateCardProps {
-  template: ConfigTemplate
+  template: TemplateInfo
   onEdit: (id: string) => void
   onCopy: (id: string) => void
   onDelete: (id: string) => void
@@ -23,26 +23,37 @@ export default function TemplateCard({ template, onEdit, onCopy, onDelete }: Tem
         <Button type="text" icon={<CopyOutlined />} onClick={() => onCopy(template.id)} size="small">
           复制
         </Button>,
-        <Popconfirm
-          title="确定删除此模板？"
-          description="删除后无法恢复"
-          onConfirm={() => onDelete(template.id)}
-        >
-          <Button type="text" danger icon={<DeleteOutlined />} size="small">
+        template.isBuiltin ? (
+          <Button type="text" disabled size="small">
             删除
           </Button>
-        </Popconfirm>,
+        ) : (
+          <Popconfirm
+            title="确定删除此模板？"
+            description="删除后无法恢复"
+            onConfirm={() => onDelete(template.id)}
+          >
+            <Button type="text" danger icon={<DeleteOutlined />} size="small">
+              删除
+            </Button>
+          </Popconfirm>
+        ),
       ]}
     >
       <Card.Meta
         avatar={<span style={{ fontSize: 32 }}>{template.icon}</span>}
-        title={<Text strong>{template.displayName}</Text>}
+        title={
+          <Space>
+            <Text strong>{template.displayName}</Text>
+            {template.isBuiltin && <Tag color="blue">内置</Tag>}
+          </Space>
+        }
         description={
           <div>
             <Text type="secondary">{template.description || '暂无描述'}</Text>
             <br />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              ID: {template.id}
+              ID: {template.templateId}
             </Text>
           </div>
         }

@@ -11,15 +11,21 @@ import { aiKeyboardConfig } from './config'
 import { useAppStore } from '@/stores/appStore'
 import { trpc } from '@/utils/trpc'
 
-export default function AIKeyboardSettingsPage() {
-  const { bundleId } = useParams<{ bundleId: string }>()
-  const { apps, currentAppId } = useAppStore()
+interface AIKeyboardSettingsPageProps {
+  appIdFromParent?: string
+}
+
+export default function AIKeyboardSettingsPage({ appIdFromParent }: AIKeyboardSettingsPageProps = {}) {
+  const { appId: appIdFromParams } = useParams<{ appId?: string; templateId?: string }>()
+  const { apps, currentAppId: currentAppIdFromStore } = useAppStore()
+  const currentAppId = appIdFromParent || currentAppIdFromStore || appIdFromParams || null
   const currentApp = apps.find((a) => a.id === currentAppId)
 
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
 
-  // 路由参数中的 bundleId 与当前 app 不匹配
+  const bundleId = currentApp?.bundleId
+  // 路由参数中的 bundleId 与当前 app 不匹配（仅当有 currentApp 时校验）
   if (bundleId && bundleId !== 'com.jaxon.aikeyboard') {
     return (
       <div>
@@ -58,12 +64,17 @@ export default function AIKeyboardSettingsPage() {
     },
   })
 
-  // 加载配置数据
+  // 加载配置数据，并合并当前应用的 appName / bundleId，使「基础信息」与所选 app 一致
   useEffect(() => {
-    if (settingsQuery.data?.settings) {
-      setFormValues(settingsQuery.data.settings)
-    }
-  }, [settingsQuery.data])
+    const data = settingsQuery.data
+    if (!data) return
+    const base = (data.settings && typeof data.settings === 'object') ? { ...data.settings } : {}
+    setFormValues({
+      ...base,
+      appName: (data as { appName?: string }).appName ?? currentApp?.name ?? base.appName,
+      bundleId: (data as { bundleId?: string }).bundleId ?? currentApp?.bundleId ?? base.bundleId,
+    })
+  }, [settingsQuery.data, currentApp?.name, currentApp?.bundleId])
 
   // 保存配置
   const handleSave = (values: Record<string, any>) => {
@@ -98,8 +109,8 @@ export default function AIKeyboardSettingsPage() {
     )
   }
 
-  // 无应用选中
-  if (!currentAppId || !currentApp) {
+  // 无 appId 才提示选择应用；有 appId 无 currentApp 时仍展示表单（如从应用管理跳转时 store 未同步）
+  if (!currentAppId) {
     return (
       <div>
         <PageHeader
@@ -113,11 +124,13 @@ export default function AIKeyboardSettingsPage() {
     )
   }
 
+  const displaySubtitle = currentApp ? `${currentApp.icon} ${currentApp.name} 的专属配置` : '当前应用的专属配置'
+
   return (
     <div>
       <PageHeader
         title="AI Keyboard 设置"
-        subtitle={`${currentApp.icon} ${currentApp.name} 的专属配置`}
+        subtitle={displaySubtitle}
         breadcrumbs={[{ title: '设置' }, { title: 'AI Keyboard' }]}
       />
 

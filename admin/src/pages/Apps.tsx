@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Card,
-  Table,
   Tag,
   Button,
   Space,
@@ -10,10 +9,16 @@ import {
   Input,
   Select,
   message,
-  Popconfirm,
+  Table,
+  Drawer,
   Row,
   Col,
   theme,
+  Typography,
+  Popconfirm,
+  Descriptions,
+  Divider,
+  Badge,
 } from 'antd'
 import {
   PlusOutlined,
@@ -21,8 +26,13 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   AppstoreOutlined,
+  UserOutlined,
+  SettingOutlined,
+  BarChartOutlined,
+  ApiOutlined,
+  EnterOutlined,
 } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
+import { useNavigate } from 'react-router-dom'
 import PageHeader from '@/components/PageHeader'
 import StatsCard from '@/components/StatsCard'
 import { useAppStore } from '@/stores/appStore'
@@ -35,45 +45,50 @@ import {
 } from '@/utils/constants'
 import { trpc } from '@/utils/trpc'
 import { useSmartLoading } from '@/hooks/useLoading'
-import { getRegisteredTemplates } from '@/config/appRegistry'
 
 const { TextArea } = Input
+const { Text } = Typography
 
 // 后端App数据接口定义
 interface BackendApp {
   id: string
   name: string
-  slug?: string
+  slug?: string | null
   bundleId: string
   platform: 'ios' | 'android' | 'web'
   description?: string | null
   isActive: boolean
   apiKey: string
   apiSecret: string
-  configTemplate?: string
-  settings?: Record<string, any>
+  configTemplate?: string | null
+  settings?: Record<string, any> | null
   createdAt: Date | string
   updatedAt: Date | string
 }
 
+// 模板数据类型定义
+interface TemplateData {
+  id: string
+  templateId: string
+  displayName: string
+  icon: string
+  description?: string
+  componentPath: string
+  defaultConfig?: Record<string, unknown>
+  isBuiltin: boolean
+  sortOrder: number
+}
+
 /**
  * 将后端App数据转换为前端AppInfo格式
- * 注：前端需要但后端没有的字段使用默认值或转换逻辑
  */
 function backendAppToFrontend(backendApp: BackendApp): AppInfo {
-  // 将isActive转换为status
   const status = backendApp.isActive ? 'active' : 'inactive'
-
-  // 获取slug：优先从API读取，否则从name生成
   const slug = backendApp.slug || backendApp.name
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-
-  // 使用平台首字母作为图标，或从设置中读取
   const icon = getIconFromPlatform(backendApp.platform)
-
-  // 获取配置模板（从顶层字段读取，兼容 settings 中的配置）
   const configTemplate = (backendApp as any).configTemplate || (backendApp as any).settings?.configTemplate
 
   return {
@@ -95,9 +110,6 @@ function backendAppToFrontend(backendApp: BackendApp): AppInfo {
   }
 }
 
-/**
- * 根据平台返回对应的emoji图标
- */
 function getIconFromPlatform(platform: 'ios' | 'android' | 'web'): string {
   switch (platform) {
     case 'ios': return '📱'
@@ -107,91 +119,92 @@ function getIconFromPlatform(platform: 'ios' | 'android' | 'web'): string {
   }
 }
 
-/**
- * 将前端AppInfo转换为后端创建/更新所需的格式
- */
-function frontendAppToBackendCreate(appInfo: Partial<AppInfo>) {
-  return {
-    name: appInfo.name || '',
-    bundleId: appInfo.bundleId || '',
-    platform: (appInfo.platform as 'ios' | 'android' | 'web') || 'ios',
-    description: appInfo.description,
-    configTemplate: appInfo.configTemplate,
-    // 创建时由后端自动生成apiKey/apiSecret
-  }
-}
-
-function frontendAppToBackendUpdate(appInfo: Partial<AppInfo>) {
-  const updateData: any = {}
-
-  if (appInfo.name !== undefined) updateData.name = appInfo.name
-  if (appInfo.description !== undefined) updateData.description = appInfo.description
-  if (appInfo.status !== undefined) updateData.isActive = appInfo.status === 'active'
-
-  return updateData
-}
-
 export default function AppsPage() {
-  const { apps, setApps, addApp, updateApp, removeApp, setCurrentApp } = useAppStore()
+  const { apps, setApps, setCurrentApp } = useAppStore()
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
   const [editingApp, setEditingApp] = useState<AppInfo | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [form] = Form.useForm()
   const { token } = theme.useToken()
+  const navigate = useNavigate()
 
-  // tRPC 查询和变更
+  // tRPC
   const appsQuery = trpc.app.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  })
+  const templatesQuery = trpc.template.list.useQuery(undefined, {
     refetchOnWindowFocus: false,
   })
   const createAppMutation = trpc.app.create.useMutation()
   const updateAppMutation = trpc.app.update.useMutation()
   const deleteAppMutation = trpc.app.delete.useMutation()
 
-  // 组合加载状态
   const overallLoading = useSmartLoading({
     queries: [appsQuery],
     mutations: [createAppMutation, updateAppMutation, deleteAppMutation],
     manualStates: [loading],
   })
 
-  // 当API数据加载完成时，更新store
   useEffect(() => {
     if (appsQuery.data) {
-      // 将后端App数据转换为前端AppInfo格式
       const convertedApps = appsQuery.data.map(backendAppToFrontend)
       setApps(convertedApps)
     }
   }, [appsQuery.data, setApps])
 
+  // 过滤应用列表
+  const filteredApps = useMemo(() => {
+    return apps.filter(app => {
+      const matchSearch = !searchText ||
+        app.name.toLowerCase().includes(searchText.toLowerCase()) ||
+        app.bundleId?.toLowerCase().includes(searchText.toLowerCase()) ||
+        app.slug?.toLowerCase().includes(searchText.toLowerCase())
+      const matchStatus = statusFilter === 'all' || app.status === statusFilter
+      return matchSearch && matchStatus
+    })
+  }, [apps, searchText, statusFilter])
+
+  // 选中应用详情
+  const selectedApp = useMemo(() => {
+    return apps.find(a => a.id === selectedAppId)
+  }, [apps, selectedAppId])
+
   // 统计
-  const stats = {
+  const stats = useMemo(() => ({
     total: apps.length,
-    active: apps.filter((a) => a.status === 'active').length,
-    maintenance: apps.filter((a) => a.status === 'maintenance').length,
-    ios: apps.filter((a) => a.platform === 'ios').length,
-  }
+    active: apps.filter(a => a.status === 'active').length,
+    inactive: apps.filter(a => a.status === 'inactive').length,
+    ios: apps.filter(a => a.platform === 'ios').length,
+  }), [apps])
 
   const handleAdd = () => {
     setEditingApp(null)
     form.resetFields()
-    form.setFieldsValue({
-      status: 'active',
-      platform: 'ios',
-    })
+    form.setFieldsValue({ status: 'active', platform: 'ios' })
     setModalOpen(true)
   }
 
-  const handleEdit = (app: AppInfo) => {
-    setEditingApp(app)
-    form.setFieldsValue(app)
-    setModalOpen(true)
+  const handleEdit = () => {
+    if (selectedApp) {
+      setEditingApp(selectedApp)
+      form.setFieldsValue(selectedApp)
+      setModalOpen(true)
+      setDrawerOpen(false)
+    }
   }
 
   const handleDelete = (id: string) => {
     deleteAppMutation.mutate({ id }, {
       onSuccess: (data) => {
         message.success(data.message || '应用已删除')
-        appsQuery.refetch() // 刷新列表
+        appsQuery.refetch()
+        if (selectedAppId === id) {
+          setSelectedAppId(null)
+        }
       },
       onError: (error) => {
         message.error(error.message || '删除应用失败')
@@ -202,65 +215,48 @@ export default function AppsPage() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-
-      // 将前端平台枚举转换为后端平台枚举
       const platform = values.platform === 'cross_platform' ? 'ios' : values.platform
 
       if (editingApp) {
-        // 更新现有应用
         const updateData: any = {
           id: editingApp.id,
           name: values.name,
           slug: values.slug,
           description: values.description,
           isActive: values.status === 'active',
+          bundleId: values.bundleId,
         }
-
-        // 添加配置模板（如果选择了模板）
-        if (values.configTemplate) {
-          updateData.configTemplate = values.configTemplate
-        }
+        if (values.configTemplate) updateData.configTemplate = values.configTemplate
 
         updateAppMutation.mutate(updateData, {
           onSuccess: async (data) => {
             message.success(data.message || '应用已更新')
-            await appsQuery.refetch() // 等待刷新完成
+            await appsQuery.refetch()
             setModalOpen(false)
           },
-          onError: (error) => {
-            message.error(error.message || '更新应用失败')
-          },
+          onError: (error) => message.error(error.message || '更新应用失败'),
         })
       } else {
-        // 创建新应用
         const createData: any = {
           name: values.name,
           slug: values.slug,
           bundleId: values.bundleId || `${values.slug}.app`,
           platform,
           description: values.description,
-          icon: values.icon || '📱', // 默认图标
+          icon: values.icon || '📱',
         }
-
-        // 添加配置模板（如果选择了模板）
-        if (values.configTemplate) {
-          createData.configTemplate = values.configTemplate
-        }
+        if (values.configTemplate) createData.configTemplate = values.configTemplate
 
         createAppMutation.mutate(createData, {
           onSuccess: async (data) => {
             message.success(data.message || '应用已创建')
-            await appsQuery.refetch() // 等待刷新完成
+            await appsQuery.refetch()
             setModalOpen(false)
           },
-          onError: (error) => {
-            message.error(error.message || '创建应用失败')
-          },
+          onError: (error) => message.error(error.message || '创建应用失败'),
         })
       }
-    } catch {
-      // 表单校验失败
-    }
+    } catch { /* 表单校验失败 */ }
   }
 
   const handleRefresh = () => {
@@ -268,72 +264,40 @@ export default function AppsPage() {
     appsQuery.refetch().then(() => {
       setLoading(false)
       message.success('数据已刷新')
-    }).catch((error) => {
-      setLoading(false)
-      console.error('刷新数据失败:', error)
-    })
+    }).catch(() => setLoading(false))
   }
 
-  const handleSwitchTo = (appId: string) => {
+  const handleViewDetail = (app: AppInfo) => {
+    setSelectedAppId(app.id)
+    setDrawerOpen(true)
+  }
+
+  const handleEnterApp = (appId: string) => {
     setCurrentApp(appId)
-    message.success('已切换到该应用')
+    navigate(`/${appId}/dashboard`)
   }
 
-  const columns: ColumnsType<AppInfo> = [
+  const handleGoToSettings = (app: AppInfo) => {
+    const targetPath = app.configTemplate ? `/${app.id}/settings/${app.configTemplate}` : `/${app.id}/settings`
+    setCurrentApp(app.id)
+    navigate(targetPath)
+  }
+
+  // 表格列定义
+  const columns = [
     {
-      title: '图标',
-      dataIndex: 'icon',
-      key: 'icon',
-      width: 60,
-      render: (icon: string) => <span className="text-2xl">{icon}</span>,
-    },
-    {
-      title: '应用名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 160,
-      render: (name: string, record) => (
-        <div>
-          <div className="font-medium">{name}</div>
-          <div
-            className="text-xs mt-0.5"
-            style={{ color: token.colorTextDescription }}
-          >
-            {record.slug}
+      title: '应用',
+      key: 'app',
+      fixed: 'left' as const,
+      width: 280,
+      render: (_: any, record: AppInfo) => (
+        <Space>
+          <span style={{ fontSize: 24 }}>{record.icon}</span>
+          <div>
+            <div style={{ fontWeight: 500 }}>{record.name}</div>
+            <Text type="secondary" style={{ fontSize: 12 }}>{record.slug}</Text>
           </div>
-        </div>
-      ),
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-    },
-    {
-      title: '平台',
-      dataIndex: 'platform',
-      key: 'platform',
-      width: 100,
-      render: (platform: string) => (
-        <Tag color={APP_PLATFORM_COLORS[platform]}>
-          {APP_PLATFORM_LABELS[platform]}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Bundle ID',
-      dataIndex: 'bundleId',
-      key: 'bundleId',
-      ellipsis: true,
-      width: 200,
-      render: (bundleId?: string) => (
-        <span
-          className="text-xs font-mono"
-          style={{ color: token.colorTextSecondary }}
-        >
-          {bundleId ?? '-'}
-        </span>
+        </Space>
       ),
     },
     {
@@ -342,71 +306,78 @@ export default function AppsPage() {
       key: 'status',
       width: 100,
       render: (status: string) => (
-        <Tag color={APP_STATUS_COLORS[status]}>
-          {APP_STATUS_LABELS[status]}
+        <Tag color={APP_STATUS_COLORS[status as keyof typeof APP_STATUS_COLORS]}>
+          {APP_STATUS_LABELS[status as keyof typeof APP_STATUS_LABELS]}
         </Tag>
       ),
+    },
+    {
+      title: '平台',
+      dataIndex: 'platform',
+      key: 'platform',
+      width: 100,
+      render: (platform: string) => (
+        <Tag color={APP_PLATFORM_COLORS[platform as keyof typeof APP_PLATFORM_COLORS]}>
+          {APP_PLATFORM_LABELS[platform as keyof typeof APP_PLATFORM_LABELS]}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Bundle ID',
+      dataIndex: 'bundleId',
+      key: 'bundleId',
+      width: 200,
+      render: (bundleId: string) => bundleId ? <Text code style={{ fontSize: 12 }}>{bundleId}</Text> : '-',
     },
     {
       title: '配置模板',
       dataIndex: 'configTemplate',
       key: 'configTemplate',
-      width: 120,
-      render: (configTemplate?: string) => {
-        if (!configTemplate) {
-          return <span style={{ color: token.colorTextQuaternary }}>-</span>
-        }
-        const template = getRegisteredTemplates().find(t => t.id === configTemplate)
-        return template ? (
-          <Tag color="blue">{template.icon} {template.displayName}</Tag>
-        ) : (
-          <Tag>{configTemplate}</Tag>
-        )
-      },
+      width: 140,
+      render: (template: string) => template ? (
+        <Tag color="blue">
+          {(templatesQuery.data as TemplateData[] | undefined)?.find(t => t.templateId === template)?.displayName || template}
+        </Tag>
+      ) : <Text type="secondary">未绑定</Text>,
     },
     {
-      title: '更新时间',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
       width: 120,
       render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
-      sorter: (a, b) =>
-        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
     },
     {
       title: '操作',
       key: 'action',
-      width: 200,
-      render: (_, record) => (
+      fixed: 'right' as const,
+      width: 220,
+      render: (_: any, record: AppInfo) => (
         <Space size="small">
           <Button
-            type="link"
+            type="primary"
             size="small"
-            onClick={() => handleSwitchTo(record.id)}
+            icon={<SettingOutlined />}
+            onClick={() => handleGoToSettings(record)}
+          >
+            设置
+          </Button>
+          <Button
+            type="text"
+            size="small"
+            icon={<EnterOutlined />}
+            onClick={() => handleEnterApp(record.id)}
           >
             进入
           </Button>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
           <Popconfirm
             title="确定删除此应用？"
-            description="删除后该应用的所有管理数据将无法访问"
+            description="删除后无法恢复"
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
           >
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-            >
+            <Button type="text" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -423,69 +394,220 @@ export default function AppsPage() {
         breadcrumbs={[{ title: '应用管理' }]}
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-              刷新
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增应用
-            </Button>
+            <Button icon={<ReloadOutlined />} onClick={handleRefresh}>刷新</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新建应用</Button>
           </Space>
         }
       />
 
       {/* 统计卡片 */}
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={12} lg={6}>
-          <StatsCard
-            title="应用总数"
-            value={stats.total}
-            icon={<AppstoreOutlined />}
-            color="#1677ff"
-          />
+      <Row gutter={[16, 16]} className="mb-4">
+        <Col xs={12} sm={6}>
+          <StatsCard title="应用总数" value={stats.total} icon={<AppstoreOutlined />} color="#1677ff" />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatsCard
-            title="运行中"
-            value={stats.active}
-            icon={<AppstoreOutlined />}
-            color="#52c41a"
-          />
+        <Col xs={12} sm={6}>
+          <StatsCard title="运行中" value={stats.active} icon={<Badge status="success" />} color="#52c41a" />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatsCard
-            title="维护中"
-            value={stats.maintenance}
-            icon={<AppstoreOutlined />}
-            color="#faad14"
-          />
+        <Col xs={12} sm={6}>
+          <StatsCard title="已停用" value={stats.inactive} icon={<Badge status="error" />} color="#ff4d4f" />
         </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <StatsCard
-            title="iOS 应用"
-            value={stats.ios}
-            icon={<AppstoreOutlined />}
-            color="#722ed1"
-          />
+        <Col xs={12} sm={6}>
+          <StatsCard title="iOS 应用" value={stats.ios} icon={<AppstoreOutlined />} color="#722ed1" />
         </Col>
       </Row>
 
-      {/* 应用列表 */}
-      <Card style={{ borderRadius: 12 }}>
+      {/* 数据表格 */}
+      <Card
+        bodyStyle={{ padding: 0 }}
+        style={{ borderRadius: 12 }}
+      >
+        {/* 搜索筛选栏 */}
+        <div style={{
+          padding: '16px 24px',
+          borderBottom: `1px solid ${token.colorBorder}`,
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          alignItems: 'center'
+        }}>
+          <Input
+            placeholder="搜索应用名称、Bundle ID、Slug..."
+            prefix={<AppstoreOutlined />}
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            allowClear
+            style={{ width: 280 }}
+          />
+          <Select
+            value={statusFilter}
+            onChange={setStatusFilter}
+            style={{ width: 120 }}
+            options={[
+              { label: '全部状态', value: 'all' },
+              { label: '运行中', value: 'active' },
+              { label: '已停用', value: 'inactive' },
+            ]}
+          />
+          <Text type="secondary">
+            共 {filteredApps.length} 个应用
+          </Text>
+        </div>
+
+        {/* 表格 */}
         <Table
-          dataSource={apps}
           columns={columns}
-          rowKey="id"
+          dataSource={filteredApps}
           loading={overallLoading}
-          pagination={{
-            showTotal: (total) => `共 ${total} 个应用`,
+          rowKey="id"
+          rowSelection={{
+            selectedRowKeys: selectedAppId ? [selectedAppId] : [],
+            onChange: (keys) => {
+              if (keys.length > 0) {
+                setSelectedAppId(keys[0] as string)
+              }
+            }
           }}
-          size="middle"
+          pagination={{
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 条`,
+            defaultPageSize: 10,
+          }}
+          scroll={{ x: 1000 }}
+          onRow={(record) => ({
+            onClick: () => handleViewDetail(record),
+            style: { cursor: 'pointer' }
+          })}
         />
       </Card>
 
+      {/* 详情抽屉 */}
+      <Drawer
+        title={
+          selectedApp ? (
+            <Space>
+              <span style={{ fontSize: 20 }}>{selectedApp.icon}</span>
+              <span>{selectedApp.name}</span>
+              <Tag color={APP_STATUS_COLORS[selectedApp.status]}>
+                {APP_STATUS_LABELS[selectedApp.status]}
+              </Tag>
+            </Space>
+          ) : '应用详情'
+        }
+        placement="right"
+        width={480}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        extra={
+          <Space>
+            <Button icon={<EditOutlined />} onClick={handleEdit}>编辑</Button>
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => selectedApp && handleGoToSettings(selectedApp)}
+            >
+              设置
+            </Button>
+            <Button
+              type="primary"
+              icon={<EnterOutlined />}
+              onClick={() => selectedApp && handleEnterApp(selectedApp.id)}
+            >
+              进入
+            </Button>
+          </Space>
+        }
+      >
+        {selectedApp && (
+          <div>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="应用名称">{selectedApp.name}</Descriptions.Item>
+              <Descriptions.Item label="应用标识">{selectedApp.slug}</Descriptions.Item>
+              <Descriptions.Item label="Bundle ID">
+                {selectedApp.bundleId ? <Text code>{selectedApp.bundleId}</Text> : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="平台">
+                <Tag color={APP_PLATFORM_COLORS[selectedApp.platform]}>
+                  {APP_PLATFORM_LABELS[selectedApp.platform]}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <Tag color={APP_STATUS_COLORS[selectedApp.status]}>
+                  {APP_STATUS_LABELS[selectedApp.status]}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="配置模板">
+                {selectedApp.configTemplate ? (
+                  <Tag color="blue">
+                    {(templatesQuery.data as TemplateData[] | undefined)?.find(t => t.templateId === selectedApp.configTemplate)?.displayName || selectedApp.configTemplate}
+                  </Tag>
+                ) : <Text type="secondary">未绑定</Text>}
+              </Descriptions.Item>
+              <Descriptions.Item label="描述">{selectedApp.description || '-'}</Descriptions.Item>
+              <Descriptions.Item label="创建时间">
+                {new Date(selectedApp.createdAt).toLocaleString('zh-CN')}
+              </Descriptions.Item>
+              <Descriptions.Item label="更新时间">
+                {new Date(selectedApp.updatedAt).toLocaleString('zh-CN')}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Divider />
+
+            <Space orientation="vertical" style={{ width: '100%' }}>
+              <Button
+                block
+                icon={<BarChartOutlined />}
+                onClick={() => handleEnterApp(selectedApp.id)}
+              >
+                数据统计
+              </Button>
+              <Button
+                block
+                icon={<UserOutlined />}
+                onClick={() => handleEnterApp(selectedApp.id)}
+              >
+                用户管理
+              </Button>
+              <Button
+                block
+                icon={<SettingOutlined />}
+                onClick={() => handleEnterApp(selectedApp.id)}
+              >
+                应用设置
+              </Button>
+              <Button
+                block
+                icon={<ApiOutlined />}
+                onClick={() => handleEnterApp(selectedApp.id)}
+              >
+                API 配置
+              </Button>
+            </Space>
+
+            <Divider />
+
+            <Popconfirm
+              title="确定删除此应用？"
+              description="删除后无法恢复"
+              onConfirm={() => {
+                handleDelete(selectedApp.id)
+                setDrawerOpen(false)
+              }}
+              okText="确定"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+            >
+              <Button block danger icon={<DeleteOutlined />}>
+                删除应用
+              </Button>
+            </Popconfirm>
+          </div>
+        )}
+      </Drawer>
+
       {/* 新增/编辑弹窗 */}
       <Modal
-        title={editingApp ? '编辑应用' : '新增应用'}
+        title={editingApp ? '编辑应用' : '新建应用'}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => setModalOpen(false)}
@@ -493,104 +615,62 @@ export default function AppsPage() {
         cancelText="取消"
         width={600}
         confirmLoading={createAppMutation.isPending || updateAppMutation.isPending}
-        okButtonProps={{
-          disabled: createAppMutation.isPending || updateAppMutation.isPending,
-        }}
       >
         <Form form={form} layout="vertical" className="mt-4">
           <Row gutter={16}>
             <Col span={16}>
-              <Form.Item
-                name="name"
-                label="应用名称"
-                rules={[{ required: true, message: '请输入应用名称' }]}
-              >
+              <Form.Item name="name" label="应用名称" rules={[{ required: true, message: '请输入应用名称' }]}>
                 <Input placeholder="例如：AI Keyboard" maxLength={50} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item
-                name="icon"
-                label="图标 (Emoji)"
-              >
+              <Form.Item name="icon" label="图标">
                 <Input placeholder="⌨️" maxLength={4} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item
-            name="slug"
-            label="应用标识 (slug)"
-            rules={[
-              { required: true, message: '请输入应用标识' },
-              { pattern: /^[a-z0-9-]+$/, message: '只允许小写字母、数字和连字符' },
-            ]}
-          >
+          <Form.Item name="slug" label="应用标识" rules={[{ required: true, message: '请输入应用标识' }]}>
             <Input placeholder="ai-keyboard" maxLength={50} />
           </Form.Item>
 
-          <Form.Item
-            name="description"
-            label="描述"
-            rules={[{ required: true, message: '请输入应用描述' }]}
-          >
-            <TextArea rows={2} placeholder="简要描述该应用..." maxLength={200} showCount />
+          <Form.Item name="description" label="描述" rules={[{ required: true, message: '请输入描述' }]}>
+            <TextArea rows={2} placeholder="简要描述..." maxLength={200} showCount />
           </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item
-                name="platform"
-                label="平台"
-                rules={[{ required: true }]}
-              >
-                <Select
-                  options={[
-                    { label: 'iOS', value: 'ios' },
-                    { label: 'Android', value: 'android' },
-                    { label: 'Web', value: 'web' },
-                    { label: '跨平台', value: 'cross_platform' },
-                  ]}
-                />
+              <Form.Item name="platform" label="平台" rules={[{ required: true }]}>
+                <Select options={[
+                  { label: 'iOS', value: 'ios' },
+                  { label: 'Android', value: 'android' },
+                  { label: 'Web', value: 'web' },
+                ]} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="status" label="状态" rules={[{ required: true }]}>
-                <Select
-                  options={[
-                    { label: '运行中', value: 'active' },
-                    { label: '未激活', value: 'inactive' },
-                    { label: '维护中', value: 'maintenance' },
-                    { label: '已归档', value: 'archived' },
-                  ]}
-                />
+                <Select options={[
+                  { label: '运行中', value: 'active' },
+                  { label: '未激活', value: 'inactive' },
+                ]} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="bundleId" label="Bundle ID / Package Name">
+          <Form.Item name="bundleId" label="Bundle ID">
             <Input placeholder="com.example.myapp" maxLength={100} />
           </Form.Item>
 
-          <Form.Item
-            name="configTemplate"
-            label="配置模板"
-            tooltip="选择该应用使用的设置界面模板，多个应用可以使用同一模板"
-          >
+          <Form.Item name="configTemplate" label="配置模板" tooltip="选择该应用使用的设置界面模板">
             <Select
               placeholder="选择配置模板（可选）"
               allowClear
-              options={[
-                ...getRegisteredTemplates().map((t) => ({
-                  label: `${t.icon} ${t.displayName}`,
-                  value: t.id,
-                })),
-                {
-                  label: '无模板',
-                  value: '',
-                  disabled: false,
-                },
-              ]}
+              options={(templatesQuery.data as TemplateData[] | undefined || []).map(t => ({
+                label: `${t.icon} ${t.displayName}`,
+                value: t.templateId,
+              }))}
+              loading={templatesQuery.isLoading}
             />
           </Form.Item>
         </Form>

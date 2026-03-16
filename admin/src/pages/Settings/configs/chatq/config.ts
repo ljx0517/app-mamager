@@ -37,12 +37,16 @@ export const chatqConfig: SettingsConfig = {
       description: 'ChatQ 核心功能开关',
       type: 'custom',
       component: ChatqFeaturePanel,
+      // 对应的配置 key，用于保存到服务器
+      keys: ['enableCustomReply', 'enableKeywordReply', 'enableQuickPhrases', 'enableContextAware', 'enableAISmartAdjust'],
     },
     {
       section: '回复风格',
       description: '配置 AI 回复风格',
       type: 'custom',
       component: ChatqStylesPanel,
+      // 对应的配置 key，用于保存到服务器
+      keys: ['enabledStyles'],
     },
     {
       section: 'API 配置',
@@ -86,6 +90,13 @@ export const chatqConfig: SettingsConfig = {
           label: '每日生成上限',
           placeholder: '每日 AI 生成次数',
           tooltip: '所有用户每天的 AI 生成次数限制',
+        },
+        {
+          key: 'maxPersonaCards',
+          type: 'number',
+          label: '人设卡片数量上限',
+          placeholder: '0 表示不限',
+          tooltip: '单用户可创建的人设卡片数量上限，0 表示不限制',
         },
       ],
     },
