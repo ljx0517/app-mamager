@@ -23,16 +23,16 @@ React admin dashboard for multi-tenant iOS app management:
 - Config system: 1:N template reuse (one config → multiple apps)
 
 ## 3. Must-Use Tools & Commands (Actionable Bash)
-Package manager: **npm only** (no yarn/pnpm)
+Package manager: **pnpm** (monorepo 统一管理)
 ```bash
-npm install          # Install dependencies
-npm run dev          # Dev server (port 3100, hot reload)
-npm run build        # Build production bundle (dist/)
-npm run preview      # Preview production build
-npm run lint         # Code style check
+pnpm install          # Install dependencies (根目录执行)
+pnpm dev             # 并行启动所有子项目
+
+# 单独启动 admin
+cd admin && pnpm dev
 
 # Dev workflow prereq
-cd ../server && yarn dev  # Start backend (required for API access)
+cd ../server && pnpm dev  # Start backend (required for API access)
 ```
 
 ## 4. Key Directories (Where things live)
@@ -61,8 +61,8 @@ src/
 - Auth: JWT in localStorage + route guards (ProtectedRoute)
 
 ## 6. Workflow (How we collaborate)
-1. Start backend first (`cd ../server && yarn dev`)
-2. Run admin frontend (`npm run dev`) → http://localhost:3100
+1. Start backend first (`cd ../server && pnpm dev`)
+2. Run admin frontend (`pnpm dev`) → http://localhost:3100
 3. API calls: Use tRPC hooks (auto error handling, no manual try/catch)
 4. Config template changes: Update registry + template folder
 5. Frontend-only solutions (no backend modifications)
