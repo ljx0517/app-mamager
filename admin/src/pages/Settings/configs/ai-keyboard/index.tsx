@@ -24,26 +24,6 @@ export default function AIKeyboardSettingsPage({ appIdFromParent }: AIKeyboardSe
   const [formValues, setFormValues] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
 
-  const bundleId = currentApp?.bundleId
-  // 路由参数中的 bundleId 与当前 app 不匹配（仅当有 currentApp 时校验）
-  if (bundleId && bundleId !== 'com.jaxon.aikeyboard') {
-    return (
-      <div>
-        <PageHeader
-          title="应用设置"
-          subtitle="应用配置不匹配"
-          breadcrumbs={[{ title: '应用设置' }]}
-        />
-        <Alert
-          message="配置错误"
-          description="当前应用的 bundleId 与配置不匹配"
-          type="error"
-          showIcon
-        />
-      </div>
-    )
-  }
-
   // tRPC - 获取应用配置
   const settingsQuery = trpc.settings.app.useQuery(
     { appId: currentAppId! },
@@ -90,6 +70,26 @@ export default function AIKeyboardSettingsPage({ appIdFromParent }: AIKeyboardSe
       appId: currentAppId!,
       ...flatValues,
     })
+  }
+
+  // 路由参数中的 bundleId 与当前 app 不匹配（仅当有 currentApp 时校验）
+  const bundleId = currentApp?.bundleId
+  if (bundleId && bundleId !== 'com.jaxon.aikeyboard') {
+    return (
+      <div>
+        <PageHeader
+          title="应用设置"
+          subtitle="应用配置不匹配"
+          breadcrumbs={[{ title: '应用设置' }]}
+        />
+        <Alert
+          message="配置错误"
+          description="当前应用的 bundleId 与配置不匹配"
+          type="error"
+          showIcon
+        />
+      </div>
+    )
   }
 
   // 加载中

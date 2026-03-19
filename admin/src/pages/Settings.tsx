@@ -10,7 +10,7 @@ import {
   BellOutlined,
   SecurityScanOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import PageHeader from '@/components/PageHeader'
 import { useAppStore } from '@/stores/appStore'
 import { trpc } from '@/utils/trpc'
@@ -24,9 +24,8 @@ const templateSettingsLazy: Record<string, LazyExoticComponent<ComponentType<{ a
 }
 
 export default function SettingsPage() {
-  const location = useLocation()
   const { appId, templateId } = useParams<{ appId?: string; templateId?: string }>()
-  const { currentApp, setCurrentApp, apps } = useAppStore()
+  const { currentApp, setCurrentApp } = useAppStore()
 
   // 当 URL 中有 appId 时立即同步到 store（用 useLayoutEffect 在首帧前执行，避免从应用管理跳转时子组件读到 currentAppId 为空）
   useLayoutEffect(() => {
@@ -113,18 +112,18 @@ function TemplateSettingsSelector() {
   // 获取当前 App 的配置模板
   const configTemplate = currentApp?.configTemplate
 
-  // 如果当前 App 已有配置模板，直接跳转
-  if (configTemplate && hasConfigTemplate(configTemplate) && appId) {
-    navigate(`/${appId}/settings/${configTemplate}`)
-    return null
-  }
-
   // 如果只有一个，直接跳转
   useEffect(() => {
     if (availableTemplates.length === 1 && appId) {
       navigate(`/${appId}/settings/${availableTemplates[0].id}`)
     }
   }, [availableTemplates, navigate, appId])
+
+  // 如果当前 App 已有配置模板，直接跳转
+  if (configTemplate && hasConfigTemplate(configTemplate) && appId) {
+    navigate(`/${appId}/settings/${configTemplate}`)
+    return null
+  }
 
   if (availableTemplates.length === 0) {
     return <DefaultSettingsPage />

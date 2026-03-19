@@ -3,8 +3,6 @@ import type { SpinProps } from 'antd'
 import { LoadingOutlined } from '@ant-design/icons'
 
 interface LoadingProps {
-  /** 加载状态 */
-  loading?: boolean
   /** 加载提示文本 */
   tip?: string
   /** 是否显示为骨架屏（用于内容占位） */
@@ -24,7 +22,6 @@ interface LoadingProps {
  * 支持多种加载场景：全屏加载、内联加载、骨架屏占位
  */
 export default function Loading({
-  loading: _loading = true,
   tip = '加载中...',
   skeleton = false,
   rows = 3,
