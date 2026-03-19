@@ -146,12 +146,18 @@ export default function AnalyticsPage() {
   const timeSeries = usageData?.timeSeries || []
 
   const distribution = usageData?.distribution as { popularStyles?: Array<{ name?: string; styleId?: string }> } | undefined
+
+  // 使用静态模拟数据（因为 API 未返回详细数据）
+  const mockEndpoints = [
+    { key: '1', endpoint: '/api/ai/reply', calls: 8432, avgMs: 234, errorRate: 0.12 },
+    { key: '2', endpoint: '/api/ai/chat', calls: 5621, avgMs: 189, errorRate: 0.08 },
+    { key: '3', endpoint: '/api/ai/summarize', calls: 3210, avgMs: 312, errorRate: 0.15 },
+    { key: '4', endpoint: '/api/ai/translate', calls: 2156, avgMs: 156, errorRate: 0.05 },
+    { key: '5', endpoint: '/api/ai/generate', calls: 1089, avgMs: 278, errorRate: 0.21 },
+  ]
   const topEndpoints = (distribution?.popularStyles?.slice(0, 5) ?? []).map((item, index) => ({
-    key: String(index + 1),
-    endpoint: item.name || item.styleId || '',
-    calls: Math.floor(Math.random() * 10000) + 1000,
-    avgMs: Math.floor(Math.random() * 300) + 100,
-    errorRate: Number((Math.random() * 3).toFixed(2)),
+    ...mockEndpoints[index],
+    endpoint: item.name || item.styleId || mockEndpoints[index].endpoint,
   }))
 
   const dailyTrend = timeSeries.map((item: { timePeriod?: unknown; totalReplies?: number; failedCalls?: number }, index: number) => ({

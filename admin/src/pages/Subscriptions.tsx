@@ -156,7 +156,7 @@ export default function SubscriptionsPage() {
     try {
       await Promise.all([refetchSubs()])
       message.success('数据已刷新')
-    } catch (error) {
+    } catch {
       message.error('刷新失败，请重试')
     } finally {
       setManualLoading(false)
