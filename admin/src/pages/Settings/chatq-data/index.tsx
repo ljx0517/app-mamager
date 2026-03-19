@@ -288,6 +288,7 @@ function ScenesTab() {
   const handleOk = () => {
     form.validateFields().then((vals) => {
       if (modal.editing) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { sceneId: _, ...rest } = vals
         updateMut.mutate({ id: modal.editing.id, ...rest })
       } else {
@@ -377,6 +378,7 @@ function RelationsTab() {
   const handleOk = () => {
     form.validateFields().then((vals) => {
       if (modal.editing) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { relationId: _, ...rest } = vals
         updateMut.mutate({ id: modal.editing.id, ...rest })
       } else {
@@ -474,6 +476,7 @@ function PersonaPackagesTab() {
   const handleOk = () => {
     form.validateFields().then((vals) => {
       if (modal.editing) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { packageId: _, ...rest } = vals
         updateMut.mutate({ id: modal.editing.id, ...rest })
       } else {

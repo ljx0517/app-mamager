@@ -113,6 +113,7 @@ registerConfigTemplate({
 export const appRegistry = configTemplateRegistry
 
 // @deprecated 请使用 registerConfigTemplate
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function registerApp(_config: { bundleId: string; displayName: string; icon: string; enabled: boolean; settingsComponent: () => Promise<{ default: React.ComponentType }> }) {
   console.warn('registerApp 已废弃，请使用 registerConfigTemplate')
 }
